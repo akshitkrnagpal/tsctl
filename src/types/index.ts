@@ -289,6 +289,17 @@ export const CurationItemSchema = z.object({
   metadata: z.record(z.unknown()).optional(),
   effective_from_ts: z.number().optional(),
   effective_to_ts: z.number().optional(),
+  diversity: z
+    .object({
+      similarity_metric: z.array(
+        z.object({
+          field: z.string(),
+          method: z.enum(["jaccard", "equality", "vector_distance"]),
+          weight: z.number().optional(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 export type CurationItem = z.infer<typeof CurationItemSchema>;
