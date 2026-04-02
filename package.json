@@ -1,6 +1,6 @@
 {
   "name": "@tsctl/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Terraform-like CLI for managing Typesense collections, aliases, synonyms, and curations",
   "type": "module",
   "main": "./dist/index.mjs",
