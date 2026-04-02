@@ -194,6 +194,26 @@ export type OverrideConfig = z.infer<typeof OverrideConfigSchema>;
 
 export const AnalyticsRuleParamsSchema = z.object({
   destination_collection: z.string().optional(),
+  // v30+: structured source/destination
+  source: z
+    .object({
+      collections: z.array(z.string()).optional(),
+      events: z
+        .array(
+          z.object({
+            type: z.string(),
+            name: z.string(),
+            weight: z.number().optional(),
+          })
+        )
+        .optional(),
+    })
+    .optional(),
+  destination: z
+    .object({
+      collection: z.string(),
+    })
+    .optional(),
   limit: z.number().optional(),
   capture_search_requests: z.boolean().optional(),
   meta_fields: z.array(z.string()).optional(),
