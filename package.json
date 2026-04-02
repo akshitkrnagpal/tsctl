@@ -1,5 +1,5 @@
 {
-  "name": "tsctl",
+  "name": "@tsctl/cli",
   "version": "0.2.0",
   "description": "Terraform-like CLI for managing Typesense collections, aliases, synonyms, and curations",
   "type": "module",

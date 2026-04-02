@@ -58,7 +58,7 @@ bunx tsctl import
 The config file is `tsctl.config.ts`:
 
 ```typescript
-import { defineConfig } from "tsctl";
+import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig({
   collections: [

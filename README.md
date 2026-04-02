@@ -19,9 +19,9 @@ Supports **Typesense v27+** and **v30+** with full backward compatibility.
 ## Installation
 
 ```bash
-npm install -g tsctl
+npm install -g @tsctl/cli
 # or
-npx tsctl
+npx @tsctl/cli
 ```
 
 ## Quick Start
@@ -52,7 +52,7 @@ TYPESENSE_API_KEY=your-api-key-here
 Edit `tsctl.config.ts`:
 
 ```typescript
-import { defineConfig } from "tsctl";
+import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig({
   collections: [
@@ -149,7 +149,7 @@ tsctl supports multiple configuration file formats and locations. Files are sear
 **TypeScript (recommended):**
 ```typescript
 // tsctl.config.ts
-import { defineConfig } from "tsctl";
+import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig({
   collections: [{ name: "products", fields: [...] }],
@@ -442,7 +442,7 @@ Reference from fields:
 ## Full Configuration Example
 
 ```typescript
-import { defineConfig } from "tsctl";
+import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig({
   collections: [

@@ -1,5 +1,5 @@
 // Main entry point for library usage
-// Users can import { defineConfig } from "tsctl"
+// Users can import { defineConfig } from "@tsctl/cli"
 
 export {
   defineConfig,

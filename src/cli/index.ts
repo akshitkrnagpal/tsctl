@@ -70,7 +70,7 @@ program
 
     // Create sample config file
     const configPath = resolve(process.cwd(), "tsctl.config.ts");
-    const sampleConfig = `import { defineConfig } from "tsctl";
+    const sampleConfig = `import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig({
   collections: [
@@ -533,7 +533,7 @@ program
         stemmingDictionaries: stemmingDictionaries.length > 0 ? stemmingDictionaries : undefined,
       };
 
-      const configContent = `import { defineConfig } from "tsctl";
+      const configContent = `import { defineConfig } from "@tsctl/cli";
 
 export default defineConfig(${JSON.stringify(config, null, 2)});
 `;
