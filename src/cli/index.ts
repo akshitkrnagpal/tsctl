@@ -8,7 +8,7 @@ import { writeFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { createInterface } from "readline";
 
-import { getClientFromEnv, testConnection } from "../client/index.js";
+import { getClientFromEnv, getClient, testConnection } from "../client/index.js";
 import { loadConfig, findConfigFile } from "../config/loader.js";
 import { loadState, saveState, formatResourceId } from "../state/index.js";
 import { buildPlan, formatPlan, importResources, buildNewState, detectDrift, formatDriftReport } from "../plan/index.js";
@@ -38,14 +38,36 @@ function loadEnvironment(env?: string): void {
 
 const program = new Command();
 
+/** Global CLI options accessible from any command */
+interface GlobalOpts {
+  env?: string;
+  verbose?: boolean;
+  quiet?: boolean;
+  noColor?: boolean;
+  debug?: boolean;
+}
+
+function getGlobalOpts(): GlobalOpts {
+  return program.opts() as GlobalOpts;
+}
+
 program
   .name("tsctl")
   .description("Terraform-like CLI for managing Typesense infrastructure")
-  .version("0.1.0")
+  .version("0.2.1", "-V, --version")
   .option("-e, --env <environment>", "Environment to use (loads .env.<environment>)")
+  .option("-v, --verbose", "Show detailed output")
+  .option("-q, --quiet", "Suppress non-essential output")
+  .option("--no-color", "Disable colored output")
+  .option("--debug", "Show debug information and stack traces")
   .hook("preAction", (thisCommand) => {
-    const opts = thisCommand.opts();
+    const opts = thisCommand.opts() as GlobalOpts;
     loadEnvironment(opts.env);
+
+    // Handle --no-color
+    if (opts.noColor || process.env.NO_COLOR) {
+      chalk.level = 0;
+    }
   });
 
 // ============================================================================
@@ -176,6 +198,107 @@ TYPESENSE_API_KEY=your-${env.name}-api-key-here
     console.log(chalk.gray("  2. Edit tsctl.config.ts to define your schema"));
     console.log(chalk.gray("  3. Run 'tsctl plan' to see what will be created"));
     console.log(chalk.gray("  4. Run 'tsctl apply' to apply changes"));
+  });
+
+// ============================================================================
+// doctor command
+// ============================================================================
+
+program
+  .command("doctor")
+  .description("Check system configuration and connectivity")
+  .action(async () => {
+    const { quiet } = getGlobalOpts();
+    let allGood = true;
+
+    if (!quiet) console.log(chalk.bold("\ntsctl doctor\n"));
+
+    // 1. Check for config file
+    const configFile = await findConfigFile();
+    if (configFile) {
+      if (!quiet) console.log(chalk.green(`  ✓ Config found: ${configFile}`));
+    } else {
+      if (!quiet) console.log(chalk.yellow(`  ⚠ No config file found`));
+      allGood = false;
+    }
+
+    // 2. Validate config if it exists
+    if (configFile) {
+      try {
+        const config = await loadConfig(configFile);
+        const resourceCount =
+          (config.collections?.length || 0) +
+          (config.aliases?.length || 0) +
+          (config.synonyms?.length || 0) +
+          (config.synonymSets?.length || 0) +
+          (config.overrides?.length || 0) +
+          (config.curationSets?.length || 0) +
+          (config.analyticsRules?.length || 0) +
+          (config.apiKeys?.length || 0) +
+          (config.stopwords?.length || 0) +
+          (config.presets?.length || 0) +
+          (config.stemmingDictionaries?.length || 0);
+        if (!quiet) console.log(chalk.green(`  ✓ Config valid (${resourceCount} resources defined)`));
+      } catch (error) {
+        if (!quiet) console.log(chalk.red(`  ✗ Config invalid: ${error instanceof Error ? error.message : String(error)}`));
+        allGood = false;
+      }
+    }
+
+    // 3. Check environment variables
+    const apiKey = process.env.TYPESENSE_API_KEY;
+    if (apiKey) {
+      if (!quiet) console.log(chalk.green(`  ✓ TYPESENSE_API_KEY is set`));
+    } else {
+      if (!quiet) console.log(chalk.red(`  ✗ TYPESENSE_API_KEY is not set`));
+      allGood = false;
+    }
+
+    // 4. Test connection
+    if (apiKey) {
+      try {
+        getClientFromEnv();
+        const connected = await testConnection();
+        if (connected) {
+          if (!quiet) console.log(chalk.green(`  ✓ Connected to Typesense`));
+
+          // 5. Check state collection
+          try {
+            const state = await loadState();
+            if (!quiet) console.log(chalk.green(`  ✓ State accessible (${state.resources.length} managed resources)`));
+          } catch {
+            if (!quiet) console.log(chalk.yellow(`  ⚠ Could not load state`));
+          }
+
+          // 6. Get server version
+          try {
+            const client = getClientFromEnv();
+            const debug = await client.debug.retrieve();
+            const version = (debug as any).version;
+            if (!quiet) console.log(chalk.green(`  ✓ Typesense version: ${version}`));
+          } catch {
+            // debug endpoint may not be available
+          }
+        } else {
+          if (!quiet) console.log(chalk.red(`  ✗ Cannot connect to Typesense`));
+          allGood = false;
+        }
+      } catch (error) {
+        if (!quiet) console.log(chalk.red(`  ✗ Connection error: ${error instanceof Error ? error.message : String(error)}`));
+        allGood = false;
+      }
+    }
+
+    if (!quiet) {
+      console.log();
+      if (allGood) {
+        console.log(chalk.green("  All checks passed!"));
+      } else {
+        console.log(chalk.yellow("  Some checks failed. See above for details."));
+      }
+    }
+
+    if (!allGood) process.exit(1);
   });
 
 // ============================================================================
@@ -346,6 +469,7 @@ program
   .option("-y, --yes", "Auto-approve changes")
   .option("--force-recreate", "Force recreation of collections with incompatible changes")
   .option("-t, --target <resources...>", "Only apply specific resources (e.g., collection.products alias.products_live)")
+  .option("-n, --dry-run", "Show what would be applied without making changes")
   .action(async (options) => {
     try {
       // Initialize client
@@ -381,6 +505,12 @@ program
       console.log(formatPlan(plan));
 
       if (!plan.hasChanges) {
+        return;
+      }
+
+      // Dry run: just show the plan and exit
+      if (options.dryRun) {
+        console.log(chalk.gray("\nDry run — no changes applied."));
         return;
       }
 
@@ -990,8 +1120,8 @@ program
   .description("Generate shell completion script")
   .argument("<shell>", "Shell type: bash, zsh, or fish")
   .action((shell: string) => {
-    const commands = "init validate plan apply destroy import drift migrate env state completion";
-    const globalFlags = "--env --help --version";
+    const commands = "init validate plan apply destroy import drift migrate env state doctor completion";
+    const globalFlags = "--env --verbose --quiet --no-color --debug --help --version";
 
     switch (shell) {
       case "bash":
@@ -1033,11 +1163,16 @@ _tsctl() {
     'migrate:Blue/green migration'
     'env:Manage environments'
     'state:Manage state'
+    'doctor:Check system configuration'
     'completion:Generate shell completions'
   )
 
   _arguments -C \\
     '--env[Environment]:environment' \\
+    '--verbose[Detailed output]' \\
+    '--quiet[Suppress output]' \\
+    '--no-color[Disable colors]' \\
+    '--debug[Debug info]' \\
     '--help[Show help]' \\
     '--version[Show version]' \\
     '1:command:->command' \\
@@ -1059,7 +1194,7 @@ _tsctl() {
           _arguments '--config[Config file]:file:_files' '--out[Output file]:file:_files' '--json[JSON output]'
           ;;
         apply)
-          _arguments '--config[Config file]:file:_files' '-y[Auto-approve]' '--target[Target resources]:resource'
+          _arguments '--config[Config file]:file:_files' '-y[Auto-approve]' '--target[Target resources]:resource' '-n[Dry run]'
           ;;
       esac
       ;;
@@ -1081,14 +1216,20 @@ complete -c tsctl -n '__fish_use_subcommand' -a 'drift' -d 'Detect drift'
 complete -c tsctl -n '__fish_use_subcommand' -a 'migrate' -d 'Blue/green migration'
 complete -c tsctl -n '__fish_use_subcommand' -a 'env' -d 'Manage environments'
 complete -c tsctl -n '__fish_use_subcommand' -a 'state' -d 'Manage state'
+complete -c tsctl -n '__fish_use_subcommand' -a 'doctor' -d 'Check system configuration'
 complete -c tsctl -n '__fish_use_subcommand' -a 'completion' -d 'Generate completions'
 complete -c tsctl -l env -d 'Environment to use'
+complete -c tsctl -s v -l verbose -d 'Detailed output'
+complete -c tsctl -s q -l quiet -d 'Suppress output'
+complete -c tsctl -l no-color -d 'Disable colors'
+complete -c tsctl -l debug -d 'Debug info'
 complete -c tsctl -n '__fish_seen_subcommand_from plan' -l config -d 'Config file'
 complete -c tsctl -n '__fish_seen_subcommand_from plan' -l json -d 'JSON output'
 complete -c tsctl -n '__fish_seen_subcommand_from plan' -l out -d 'Output file'
 complete -c tsctl -n '__fish_seen_subcommand_from apply' -l config -d 'Config file'
 complete -c tsctl -n '__fish_seen_subcommand_from apply' -s y -l yes -d 'Auto-approve'
 complete -c tsctl -n '__fish_seen_subcommand_from apply' -s t -l target -d 'Target resources'
+complete -c tsctl -n '__fish_seen_subcommand_from apply' -s n -l dry-run -d 'Dry run'
 complete -c tsctl -n '__fish_seen_subcommand_from state' -a 'list show clear'
 complete -c tsctl -n '__fish_seen_subcommand_from env' -a 'list show'`);
         break;
