@@ -228,6 +228,42 @@ program
           console.log(chalk.gray(`    - ${k.description} [${collections}]`));
         }
       }
+      if (config.synonymSets?.length) {
+        console.log(chalk.gray(`  Synonym Sets: ${config.synonymSets.length}`));
+        for (const s of config.synonymSets) {
+          console.log(chalk.gray(`    - ${s.name} (${s.items.length} items)`));
+        }
+      }
+      if (config.curationSets?.length) {
+        console.log(chalk.gray(`  Curation Sets: ${config.curationSets.length}`));
+        for (const c of config.curationSets) {
+          console.log(chalk.gray(`    - ${c.name} (${c.items.length} items)`));
+        }
+      }
+      if (config.stopwords?.length) {
+        console.log(chalk.gray(`  Stopwords: ${config.stopwords.length}`));
+        for (const s of config.stopwords) {
+          console.log(chalk.gray(`    - ${s.id} (${s.stopwords.length} words)`));
+        }
+      }
+      if (config.presets?.length) {
+        console.log(chalk.gray(`  Presets: ${config.presets.length}`));
+        for (const p of config.presets) {
+          console.log(chalk.gray(`    - ${p.name}`));
+        }
+      }
+      if (config.analyticsRules?.length) {
+        console.log(chalk.gray(`  Analytics Rules: ${config.analyticsRules.length}`));
+        for (const r of config.analyticsRules) {
+          console.log(chalk.gray(`    - ${r.name} (${r.type})`));
+        }
+      }
+      if (config.stemmingDictionaries?.length) {
+        console.log(chalk.gray(`  Stemming Dictionaries: ${config.stemmingDictionaries.length}`));
+        for (const d of config.stemmingDictionaries) {
+          console.log(chalk.gray(`    - ${d.id} (${d.words.length} words)`));
+        }
+      }
     } catch (error) {
       spinner.fail("Config validation failed");
       console.error(chalk.red(`\n${error instanceof Error ? error.message : String(error)}`));
@@ -419,7 +455,7 @@ program
       getClientFromEnv();
 
       const spinner = ora("Importing resources...").start();
-      const { collections, aliases, synonyms, synonymSets, overrides, analyticsRules, apiKeys } = await importResources();
+      const { collections, aliases, synonyms, synonymSets, overrides, curationSets, analyticsRules, apiKeys, stopwords, presets, stemmingDictionaries } = await importResources();
       spinner.succeed("Resources imported");
 
       console.log(chalk.gray("\nFound:"));
@@ -428,8 +464,12 @@ program
       console.log(chalk.gray(`  Synonyms: ${synonyms.length}`));
       console.log(chalk.gray(`  Synonym Sets: ${synonymSets.length}`));
       console.log(chalk.gray(`  Overrides: ${overrides.length}`));
+      console.log(chalk.gray(`  Curation Sets: ${curationSets.length}`));
       console.log(chalk.gray(`  Analytics Rules: ${analyticsRules.length}`));
       console.log(chalk.gray(`  API Keys: ${apiKeys.length}`));
+      console.log(chalk.gray(`  Stopwords: ${stopwords.length}`));
+      console.log(chalk.gray(`  Presets: ${presets.length}`));
+      console.log(chalk.gray(`  Stemming Dictionaries: ${stemmingDictionaries.length}`));
 
       if (apiKeys.length > 0) {
         console.log(chalk.yellow("\n  Note: API key values cannot be retrieved after creation."));
@@ -443,8 +483,12 @@ program
         synonyms: synonyms.length > 0 ? synonyms : undefined,
         synonymSets: synonymSets.length > 0 ? synonymSets : undefined,
         overrides: overrides.length > 0 ? overrides : undefined,
+        curationSets: curationSets.length > 0 ? curationSets : undefined,
         analyticsRules: analyticsRules.length > 0 ? analyticsRules : undefined,
         apiKeys: apiKeys.length > 0 ? apiKeys : undefined,
+        stopwords: stopwords.length > 0 ? stopwords : undefined,
+        presets: presets.length > 0 ? presets : undefined,
+        stemmingDictionaries: stemmingDictionaries.length > 0 ? stemmingDictionaries : undefined,
       };
 
       const configContent = `import { defineConfig } from "tsctl";

@@ -204,7 +204,7 @@ export const AnalyticsRuleParamsSchema = z.object({
 
 export const AnalyticsRuleConfigSchema = z.object({
   name: z.string(),
-  type: z.enum(["popular_queries", "nohits_queries", "counter"]),
+  type: z.enum(["popular_queries", "nohits_queries", "counter", "log"]),
   collection: z.string(),
   event_type: z.enum(["search", "click", "conversion", "visit", "custom"]),
   rule_tag: z.string().optional(),
