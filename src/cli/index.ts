@@ -54,7 +54,7 @@ function getGlobalOpts(): GlobalOpts {
 program
   .name("tsctl")
   .description("Terraform-like CLI for managing Typesense infrastructure")
-  .version("0.2.1", "-V, --version")
+  .version("0.3.0", "-V, --version")
   .option("-e, --env <environment>", "Environment to use (loads .env.<environment>)")
   .option("-v, --verbose", "Show detailed output")
   .option("-q, --quiet", "Suppress non-essential output")
