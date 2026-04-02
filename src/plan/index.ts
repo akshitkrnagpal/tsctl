@@ -1199,6 +1199,61 @@ export async function detectDrift(): Promise<DriftReport> {
     }
   }
 
+  // Check for unmanaged stopwords
+  const managedStopwords = new Set(
+    state.resources
+      .filter((r) => r.identifier.type === "stopword")
+      .map((r) => r.identifier.name)
+  );
+  const allStopwords = await listStopwordSets();
+  for (const sw of allStopwords) {
+    if (!managedStopwords.has(sw.id)) {
+      items.push({
+        identifier: { type: "stopword", name: sw.id },
+        type: "unmanaged",
+        actualConfig: sw,
+      });
+    }
+  }
+
+  // Check for unmanaged presets
+  const managedPresets = new Set(
+    state.resources
+      .filter((r) => r.identifier.type === "preset")
+      .map((r) => r.identifier.name)
+  );
+  const allPresets = await listPresets();
+  for (const preset of allPresets) {
+    if (!managedPresets.has(preset.name)) {
+      items.push({
+        identifier: { type: "preset", name: preset.name },
+        type: "unmanaged",
+        actualConfig: preset,
+      });
+    }
+  }
+
+  // Check for unmanaged curation sets (v30+)
+  const managedCurationSets = new Set(
+    state.resources
+      .filter((r) => r.identifier.type === "curationSet")
+      .map((r) => r.identifier.name)
+  );
+  try {
+    const allCurationSets = await listCurationSets();
+    for (const cs of allCurationSets) {
+      if (!managedCurationSets.has(cs.name)) {
+        items.push({
+          identifier: { type: "curationSet", name: cs.name },
+          type: "unmanaged",
+          actualConfig: cs,
+        });
+      }
+    }
+  } catch {
+    // Curation sets may not be available (pre-v30)
+  }
+
   const summary = {
     modified: items.filter((i) => i.type === "modified").length,
     deleted: items.filter((i) => i.type === "deleted").length,
