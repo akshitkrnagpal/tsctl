@@ -81,13 +81,19 @@ jobs:
         with:
           node-version: "24"
           registry-url: "https://npm.pkg.github.com"
-          scope: "@tsctl"
+          scope: "@akshitkrnagpal"
 
       - name: Update version (if provided)
         if: ${{ github.event.inputs.version != '' }}
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: npm version "$INPUT_VERSION" --no-git-tag-version
+
+      - name: Update package name for GitHub Packages
+        run: |
+          # GitHub Packages requires scope to match GitHub owner
+          jq '.name = "@akshitkrnagpal/tsctl"' package.json > package.tmp.json
+          mv package.tmp.json package.json
 
       - name: Publish to GitHub Packages
         run: npm publish --access public
