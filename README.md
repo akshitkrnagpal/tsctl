@@ -115,6 +115,7 @@ tsctl apply
 | `tsctl apply` | Apply changes to Typesense |
 | `tsctl destroy` | Destroy all managed resources |
 | `tsctl import` | Import existing resources |
+| `tsctl doctor` | Check config, connection, and system status |
 | `tsctl state list` | List managed resources |
 | `tsctl state show` | Show full state JSON |
 | `tsctl state clear` | Clear state (keeps resources) |
@@ -122,9 +123,49 @@ tsctl apply
 | `tsctl env show` | Show current environment config |
 | `tsctl drift` | Detect changes made outside of tsctl |
 | `tsctl migrate` | Blue/green migration for collections |
+| `tsctl completion <shell>` | Generate shell completions (bash, zsh, fish) |
 
 **Global Options:**
-- `--env <name>` - Use environment-specific `.env.<name>` file
+
+| Flag | Description |
+|------|-------------|
+| `-e, --env <name>` | Use environment-specific `.env.<name>` file |
+| `-v, --verbose` | Show detailed output |
+| `-q, --quiet` | Suppress non-essential output |
+| `--no-color` | Disable colored output (also respects `NO_COLOR` env var) |
+| `--debug` | Show debug information and stack traces |
+| `-V, --version` | Show version number |
+
+**Plan Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-c, --config <path>` | Path to config file |
+| `-o, --out <path>` | Save plan to file |
+| `--json` | Output plan as JSON |
+
+**Apply Options:**
+
+| Flag | Description |
+|------|-------------|
+| `-c, --config <path>` | Path to config file |
+| `-y, --yes` | Auto-approve changes |
+| `-n, --dry-run` | Preview changes without applying |
+| `-t, --target <resources...>` | Only apply specific resources |
+| `--force-recreate` | Force recreation of collections |
+
+### Shell Completions
+
+```bash
+# Bash — add to ~/.bashrc
+eval "$(tsctl completion bash)"
+
+# Zsh — add to ~/.zshrc
+eval "$(tsctl completion zsh)"
+
+# Fish — save to completions dir
+tsctl completion fish > ~/.config/fish/completions/tsctl.fish
+```
 
 ## Configuration Files
 
