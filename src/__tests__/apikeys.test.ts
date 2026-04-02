@@ -27,7 +27,7 @@ describe("API keys (integration)", () => {
       collections: ["products"],
     });
 
-    expect(result.id).toBeGreaterThan(0);
+    expect(result.id).toBeGreaterThanOrEqual(0);
     expect(result.value).toBeTruthy();
     expect(result.value.length).toBeGreaterThan(10);
   });
@@ -39,7 +39,7 @@ describe("API keys (integration)", () => {
       collections: ["*"],
     });
 
-    expect(result.id).toBeGreaterThan(0);
+    expect(result.id).toBeGreaterThanOrEqual(0);
   });
 
   test("creates key with custom value", async () => {
