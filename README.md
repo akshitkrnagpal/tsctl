@@ -677,6 +677,59 @@ tsctl migrate -a products_live -c tsctl.config.ts --cleanup products_17064864000
 
 \* Auto-migrated to global sets on upgrade to v30
 
+## Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh) v1.0+
+- [Docker](https://www.docker.com/) (for running Typesense locally)
+
+### Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/akshitkrnagpal/tsctl.git
+cd tsctl
+
+# Install dependencies
+bun install
+
+# Start Typesense (v27)
+docker compose up -d
+
+# Or start Typesense v30
+docker compose -f docker-compose.v30.yml up -d
+
+# Run tests
+bun test
+
+# Type check
+bun run typecheck
+```
+
+### Running Tests
+
+Tests run against a live Typesense instance. Start one with Docker Compose before running tests:
+
+```bash
+# Test against Typesense v27 (default)
+docker compose up -d
+bun test
+
+# Test against Typesense v30
+docker compose -f docker-compose.v30.yml up -d
+bun test
+
+# Stop Typesense
+docker compose down -v
+```
+
+Tests are version-aware and automatically skip tests for features not available in the running Typesense version.
+
+### CI/CD
+
+The project uses GitHub Actions to run tests against both Typesense v27 and v30 on every push and pull request. See `.github/workflows/ci.yml`.
+
 ## License
 
 MIT

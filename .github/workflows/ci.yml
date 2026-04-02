@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - run: bun x tsc --noEmit --skipLibCheck
+
+  test-v27:
+    name: Tests (Typesense v27)
+    runs-on: ubuntu-latest
+    services:
+      typesense:
+        image: typesense/typesense:27.1
+        ports:
+          - 8108:8108
+        options: >-
+          --health-cmd "curl -f http://localhost:8108/health || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+        env:
+          TYPESENSE_DATA_DIR: /data
+          TYPESENSE_API_KEY: test-api-key
+          TYPESENSE_ENABLE_CORS: "true"
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Wait for Typesense
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8108/health && break
+            echo "Waiting for Typesense... ($i)"
+            sleep 2
+          done
+      - run: bun test
+
+  test-v30:
+    name: Tests (Typesense v30)
+    runs-on: ubuntu-latest
+    services:
+      typesense:
+        image: typesense/typesense:30.0
+        ports:
+          - 8108:8108
+        options: >-
+          --health-cmd "curl -f http://localhost:8108/health || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+          --health-start-period 10s
+        env:
+          TYPESENSE_DATA_DIR: /data
+          TYPESENSE_API_KEY: test-api-key
+          TYPESENSE_ENABLE_CORS: "true"
+          TYPESENSE_ENABLE_SEARCH_ANALYTICS: "true"
+          TYPESENSE_ANALYTICS_DIR: /data/analytics
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install
+      - name: Wait for Typesense
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8108/health && break
+            echo "Waiting for Typesense... ($i)"
+            sleep 2
+          done
+      - run: bun test
