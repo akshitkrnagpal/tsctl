@@ -1,6 +1,6 @@
 {
   "name": "tsctl",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "Terraform-like CLI for managing Typesense collections, aliases, synonyms, and curations",
   "type": "module",
   "main": "./src/index.ts",

@@ -280,32 +280,57 @@ program
   .description("Show what changes will be made")
   .option("-c, --config <path>", "Path to config file")
   .option("-o, --out <path>", "Save plan to file")
+  .option("--json", "Output plan as JSON")
   .action(async (options) => {
     try {
       // Initialize client
       getClientFromEnv();
 
       // Load config
-      const spinner = ora("Loading config...").start();
+      if (!options.json) {
+        var spinner = ora("Loading config...").start();
+      }
       const config = await loadConfig(options.config);
-      spinner.succeed("Config loaded");
+      if (!options.json) spinner!.succeed("Config loaded");
 
       // Build plan
-      const planSpinner = ora("Building plan...").start();
+      if (!options.json) {
+        var planSpinner = ora("Building plan...").start();
+      }
       const plan = await buildPlan(config);
-      planSpinner.succeed("Plan built");
+      if (!options.json) planSpinner!.succeed("Plan built");
 
-      // Display plan
-      console.log(formatPlan(plan));
+      if (options.json) {
+        // JSON output: strip diff (contains ANSI codes) and output clean JSON
+        const cleanPlan = {
+          ...plan,
+          changes: plan.changes.map((c) => ({
+            action: c.action,
+            identifier: c.identifier,
+            before: c.before,
+            after: c.after,
+          })),
+        };
+        console.log(JSON.stringify(cleanPlan, null, 2));
+      } else {
+        // Display plan
+        console.log(formatPlan(plan));
+      }
 
       // Save plan if requested
       if (options.out) {
         const planPath = resolve(options.out);
         writeFileSync(planPath, JSON.stringify(plan, null, 2));
-        console.log(chalk.gray(`\nPlan saved to ${planPath}`));
+        if (!options.json) {
+          console.log(chalk.gray(`\nPlan saved to ${planPath}`));
+        }
       }
     } catch (error) {
-      console.error(chalk.red(`\nError: ${error instanceof Error ? error.message : String(error)}`));
+      if (options.json) {
+        console.error(JSON.stringify({ error: error instanceof Error ? error.message : String(error) }));
+      } else {
+        console.error(chalk.red(`\nError: ${error instanceof Error ? error.message : String(error)}`));
+      }
       process.exit(1);
     }
   });
@@ -320,6 +345,7 @@ program
   .option("-c, --config <path>", "Path to config file")
   .option("-y, --yes", "Auto-approve changes")
   .option("--force-recreate", "Force recreation of collections with incompatible changes")
+  .option("-t, --target <resources...>", "Only apply specific resources (e.g., collection.products alias.products_live)")
   .action(async (options) => {
     try {
       // Initialize client
@@ -334,6 +360,22 @@ program
       const planSpinner = ora("Building plan...").start();
       const plan = await buildPlan(config);
       planSpinner.succeed("Plan built");
+
+      // Filter plan by target if specified
+      if (options.target) {
+        const targets = new Set(options.target as string[]);
+        plan.changes = plan.changes.filter((c) => {
+          const resourceId = formatResourceId(c.identifier);
+          return targets.has(resourceId);
+        });
+        plan.hasChanges = plan.changes.some((c) => c.action !== "no-change");
+        plan.summary = {
+          create: plan.changes.filter((c) => c.action === "create").length,
+          update: plan.changes.filter((c) => c.action === "update").length,
+          delete: plan.changes.filter((c) => c.action === "delete").length,
+          noChange: plan.changes.filter((c) => c.action === "no-change").length,
+        };
+      }
 
       // Display plan
       console.log(formatPlan(plan));
@@ -936,6 +978,124 @@ stateCmd
     } catch (error) {
       console.error(chalk.red(`\nError: ${error instanceof Error ? error.message : String(error)}`));
       process.exit(1);
+    }
+  });
+
+// ============================================================================
+// completion command
+// ============================================================================
+
+program
+  .command("completion")
+  .description("Generate shell completion script")
+  .argument("<shell>", "Shell type: bash, zsh, or fish")
+  .action((shell: string) => {
+    const commands = "init validate plan apply destroy import drift migrate env state completion";
+    const globalFlags = "--env --help --version";
+
+    switch (shell) {
+      case "bash":
+        console.log(`# tsctl bash completion
+# Add to ~/.bashrc: eval "$(tsctl completion bash)"
+_tsctl_completions() {
+  local cur="\${COMP_WORDS[COMP_CWORD]}"
+  local commands="${commands}"
+  local global_flags="${globalFlags}"
+
+  if [ "\${COMP_CWORD}" -eq 1 ]; then
+    COMPREPLY=( $(compgen -W "\${commands}" -- "\${cur}") )
+  elif [ "\${COMP_CWORD}" -eq 2 ]; then
+    case "\${COMP_WORDS[1]}" in
+      state) COMPREPLY=( $(compgen -W "list show clear" -- "\${cur}") ) ;;
+      env) COMPREPLY=( $(compgen -W "list show" -- "\${cur}") ) ;;
+      plan) COMPREPLY=( $(compgen -W "--config --out --json" -- "\${cur}") ) ;;
+      apply) COMPREPLY=( $(compgen -W "--config --yes --force-recreate --target" -- "\${cur}") ) ;;
+      migrate) COMPREPLY=( $(compgen -W "--alias --config --collection --skip-delete --yes --create-only --switch-only --cleanup" -- "\${cur}") ) ;;
+      *) COMPREPLY=( $(compgen -W "\${global_flags}" -- "\${cur}") ) ;;
+    esac
+  fi
+}
+complete -F _tsctl_completions tsctl`);
+        break;
+
+      case "zsh":
+        console.log(`# tsctl zsh completion
+# Add to ~/.zshrc: eval "$(tsctl completion zsh)"
+_tsctl() {
+  local -a commands=(
+    'init:Initialize a new project'
+    'validate:Validate config file'
+    'plan:Show planned changes'
+    'apply:Apply changes to Typesense'
+    'destroy:Destroy all managed resources'
+    'import:Import existing resources'
+    'drift:Detect drift'
+    'migrate:Blue/green migration'
+    'env:Manage environments'
+    'state:Manage state'
+    'completion:Generate shell completions'
+  )
+
+  _arguments -C \\
+    '--env[Environment]:environment' \\
+    '--help[Show help]' \\
+    '--version[Show version]' \\
+    '1:command:->command' \\
+    '*::arg:->args'
+
+  case "\$state" in
+    command)
+      _describe 'command' commands
+      ;;
+    args)
+      case "\$words[1]" in
+        state)
+          _values 'subcommand' 'list[List managed resources]' 'show[Show full state]' 'clear[Clear state]'
+          ;;
+        env)
+          _values 'subcommand' 'list[List environments]' 'show[Show current environment]'
+          ;;
+        plan)
+          _arguments '--config[Config file]:file:_files' '--out[Output file]:file:_files' '--json[JSON output]'
+          ;;
+        apply)
+          _arguments '--config[Config file]:file:_files' '-y[Auto-approve]' '--target[Target resources]:resource'
+          ;;
+      esac
+      ;;
+  esac
+}
+compdef _tsctl tsctl`);
+        break;
+
+      case "fish":
+        console.log(`# tsctl fish completion
+# Save to ~/.config/fish/completions/tsctl.fish
+complete -c tsctl -n '__fish_use_subcommand' -a 'init' -d 'Initialize a new project'
+complete -c tsctl -n '__fish_use_subcommand' -a 'validate' -d 'Validate config file'
+complete -c tsctl -n '__fish_use_subcommand' -a 'plan' -d 'Show planned changes'
+complete -c tsctl -n '__fish_use_subcommand' -a 'apply' -d 'Apply changes to Typesense'
+complete -c tsctl -n '__fish_use_subcommand' -a 'destroy' -d 'Destroy all managed resources'
+complete -c tsctl -n '__fish_use_subcommand' -a 'import' -d 'Import existing resources'
+complete -c tsctl -n '__fish_use_subcommand' -a 'drift' -d 'Detect drift'
+complete -c tsctl -n '__fish_use_subcommand' -a 'migrate' -d 'Blue/green migration'
+complete -c tsctl -n '__fish_use_subcommand' -a 'env' -d 'Manage environments'
+complete -c tsctl -n '__fish_use_subcommand' -a 'state' -d 'Manage state'
+complete -c tsctl -n '__fish_use_subcommand' -a 'completion' -d 'Generate completions'
+complete -c tsctl -l env -d 'Environment to use'
+complete -c tsctl -n '__fish_seen_subcommand_from plan' -l config -d 'Config file'
+complete -c tsctl -n '__fish_seen_subcommand_from plan' -l json -d 'JSON output'
+complete -c tsctl -n '__fish_seen_subcommand_from plan' -l out -d 'Output file'
+complete -c tsctl -n '__fish_seen_subcommand_from apply' -l config -d 'Config file'
+complete -c tsctl -n '__fish_seen_subcommand_from apply' -s y -l yes -d 'Auto-approve'
+complete -c tsctl -n '__fish_seen_subcommand_from apply' -s t -l target -d 'Target resources'
+complete -c tsctl -n '__fish_seen_subcommand_from state' -a 'list show clear'
+complete -c tsctl -n '__fish_seen_subcommand_from env' -a 'list show'`);
+        break;
+
+      default:
+        console.error(`Unknown shell: ${shell}. Supported: bash, zsh, fish`);
+        process.exit(1);
     }
   });
 
