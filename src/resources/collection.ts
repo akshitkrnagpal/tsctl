@@ -23,6 +23,10 @@ function toTypesenseField(field: Field): Record<string, unknown> {
   if (field.vec_dist !== undefined) result["vec_dist"] = field.vec_dist;
   if (field.reference !== undefined) result["reference"] = field.reference;
   if (field.range_index !== undefined) result["range_index"] = field.range_index;
+  if (field.stem_dictionary !== undefined) result["stem_dictionary"] = field.stem_dictionary;
+  if (field.truncate_len !== undefined) result["truncate_len"] = field.truncate_len;
+  if (field.token_separators !== undefined) result["token_separators"] = field.token_separators;
+  if (field.symbols_to_index !== undefined) result["symbols_to_index"] = field.symbols_to_index;
   if (field.embed !== undefined) result["embed"] = field.embed;
 
   return result;
@@ -96,6 +100,13 @@ function fromTypesenseField(f: Record<string, unknown>): Field {
   if (f["vec_dist"] !== undefined) field.vec_dist = f["vec_dist"] as "cosine" | "ip";
   if (f["reference"] !== undefined) field.reference = f["reference"] as string;
   if (f["embed"] !== undefined) field.embed = f["embed"] as Field["embed"];
+  if (f["stem_dictionary"] !== undefined) field.stem_dictionary = f["stem_dictionary"] as string;
+  if (f["truncate_len"] !== undefined && f["truncate_len"] !== 100) field.truncate_len = f["truncate_len"] as number;
+  // Field-level token_separators and symbols_to_index
+  const fieldTokenSeparators = f["token_separators"] as string[] | undefined;
+  if (fieldTokenSeparators && fieldTokenSeparators.length > 0) field.token_separators = fieldTokenSeparators;
+  const fieldSymbolsToIndex = f["symbols_to_index"] as string[] | undefined;
+  if (fieldSymbolsToIndex && fieldSymbolsToIndex.length > 0) field.symbols_to_index = fieldSymbolsToIndex;
 
   return field;
 }
@@ -124,6 +135,14 @@ function toTypesenseSchema(config: CollectionConfig): CollectionCreateSchema {
   // Typesense 30.0+: synonym sets linking
   if (config.synonym_sets && config.synonym_sets.length > 0) {
     schema["synonym_sets"] = config.synonym_sets;
+  }
+  // Typesense 30.0+: curation sets linking
+  if (config.curation_sets && config.curation_sets.length > 0) {
+    schema["curation_sets"] = config.curation_sets;
+  }
+  // Custom metadata
+  if (config.metadata && Object.keys(config.metadata).length > 0) {
+    schema["metadata"] = config.metadata;
   }
 
   return schema as unknown as CollectionCreateSchema;
@@ -169,6 +188,16 @@ export async function getCollection(
     const synonymSets = collectionData["synonym_sets"] as string[] | undefined;
     if (synonymSets && synonymSets.length > 0) {
       config.synonym_sets = synonymSets;
+    }
+    // Typesense 30.0+: curation sets linking
+    const curationSets = collectionData["curation_sets"] as string[] | undefined;
+    if (curationSets && curationSets.length > 0) {
+      config.curation_sets = curationSets;
+    }
+    // Custom metadata
+    const metadata = collectionData["metadata"] as Record<string, unknown> | undefined;
+    if (metadata && Object.keys(metadata).length > 0) {
+      config.metadata = metadata;
     }
 
     return config;
@@ -224,6 +253,16 @@ export async function listCollections(): Promise<CollectionConfig[]> {
       if (synonymSets && synonymSets.length > 0) {
         config.synonym_sets = synonymSets;
       }
+      // Typesense 30.0+: curation sets linking
+      const curationSets = collection["curation_sets"] as string[] | undefined;
+      if (curationSets && curationSets.length > 0) {
+        config.curation_sets = curationSets;
+      }
+      // Custom metadata
+      const metadata = collection["metadata"] as Record<string, unknown> | undefined;
+      if (metadata && Object.keys(metadata).length > 0) {
+        config.metadata = metadata;
+      }
 
       return config;
     });
@@ -265,6 +304,10 @@ function normalizeField(f: Field): Record<string, unknown> {
   if (f.vec_dist !== undefined) result.vec_dist = f.vec_dist;
   if (f.reference !== undefined) result.reference = f.reference;
   if (f.range_index !== undefined) result.range_index = f.range_index;
+  if (f.stem_dictionary !== undefined) result.stem_dictionary = f.stem_dictionary;
+  if (f.truncate_len !== undefined) result.truncate_len = f.truncate_len;
+  if (f.token_separators !== undefined) result.token_separators = f.token_separators;
+  if (f.symbols_to_index !== undefined) result.symbols_to_index = f.symbols_to_index;
   if (f.embed !== undefined) result.embed = f.embed;
   return result;
 }
@@ -336,6 +379,23 @@ export async function updateCollection(
 
   if (synonymSetsChanged) {
     updateSchema.synonym_sets = newSynonymSets;
+  }
+
+  // Check if curation_sets changed
+  const existingCurationSets = _existing.curation_sets || [];
+  const newCurationSets = config.curation_sets || [];
+  const curationSetsChanged =
+    JSON.stringify(existingCurationSets.sort()) !== JSON.stringify(newCurationSets.sort());
+
+  if (curationSetsChanged) {
+    updateSchema.curation_sets = newCurationSets;
+  }
+
+  // Check if metadata changed
+  const existingMetadata = _existing.metadata || {};
+  const newMetadata = config.metadata || {};
+  if (JSON.stringify(existingMetadata) !== JSON.stringify(newMetadata)) {
+    updateSchema.metadata = newMetadata;
   }
 
   // Apply changes if any

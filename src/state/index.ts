@@ -4,11 +4,6 @@ import type {
   State,
   ManagedResource,
   ResourceIdentifier,
-  CollectionConfig,
-  AliasConfig,
-  SynonymConfig,
-  OverrideConfig,
-  ApiKeyConfig,
 } from "../types/index.js";
 
 const STATE_COLLECTION_NAME = "_tsctl_state";
@@ -113,7 +108,7 @@ export async function saveState(state: State): Promise<void> {
  * Compute a checksum for a resource config
  */
 export function computeChecksum(
-  config: CollectionConfig | AliasConfig | SynonymConfig | OverrideConfig | ApiKeyConfig
+  config: Record<string, unknown>
 ): string {
   const normalized = JSON.stringify(config, Object.keys(config).sort());
   return createHash("sha256").update(normalized).digest("hex").slice(0, 16);

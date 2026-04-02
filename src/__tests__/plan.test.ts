@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { setupClient, cleanupTypesense } from "./setup.js";
+import { getTypesenseVersion } from "./helpers.js";
 import { buildPlan, buildNewState } from "../plan/index.js";
 import { createCollection } from "../resources/collection.js";
 import { upsertAlias } from "../resources/alias.js";
@@ -143,7 +144,9 @@ describe("plan", () => {
       expect(aliasChange!.action).toBe("no-change");
     });
 
-    test("plans creation for new synonym", async () => {
+    test("plans creation for new synonym (pre-v30)", async () => {
+      const version = await getTypesenseVersion();
+      if (version >= 30) return;
       await createCollection({
         name: "products",
         fields: [{ name: "title", type: "string" }],
@@ -166,7 +169,9 @@ describe("plan", () => {
       expect(synChange!.action).toBe("create");
     });
 
-    test("plans creation for new override", async () => {
+    test("plans creation for new override (pre-v30)", async () => {
+      const version = await getTypesenseVersion();
+      if (version >= 30) return;
       await createCollection({
         name: "products",
         fields: [{ name: "title", type: "string" }],

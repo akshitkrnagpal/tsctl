@@ -17,6 +17,7 @@ export const FieldTypeSchema = z.enum([
   "bool[]",
   "geopoint",
   "geopoint[]",
+  "geopolygon",
   "object",
   "object[]",
   "auto",
@@ -45,6 +46,10 @@ export const FieldSchema = z.object({
   vec_dist: z.enum(["cosine", "ip"]).optional(),
   reference: z.string().optional(),
   range_index: z.boolean().optional(),
+  stem_dictionary: z.string().optional(),
+  truncate_len: z.number().optional(),
+  token_separators: z.array(z.string()).optional(),
+  symbols_to_index: z.array(z.string()).optional(),
   embed: z
     .object({
       from: z.array(z.string()),
@@ -86,6 +91,10 @@ export const CollectionConfigSchema = z.object({
   enable_nested_fields: z.boolean().optional(),
   // Typesense 30.0+: Link to global synonym sets
   synonym_sets: z.array(z.string()).optional(),
+  // Typesense 30.0+: Link to global curation sets
+  curation_sets: z.array(z.string()).optional(),
+  // Custom metadata object
+  metadata: z.record(z.unknown()).optional(),
 });
 
 export type CollectionConfig = z.infer<typeof CollectionConfigSchema>;
@@ -220,6 +229,96 @@ export const ApiKeyConfigSchema = z.object({
 export type ApiKeyConfig = z.infer<typeof ApiKeyConfigSchema>;
 
 // ============================================================================
+// Stopword Set Schema
+// ============================================================================
+
+export const StopwordSetConfigSchema = z.object({
+  id: z.string(),
+  stopwords: z.array(z.string()),
+  locale: z.string().optional(),
+});
+
+export type StopwordSetConfig = z.infer<typeof StopwordSetConfigSchema>;
+
+// ============================================================================
+// Preset Schema
+// ============================================================================
+
+export const PresetConfigSchema = z.object({
+  name: z.string(),
+  value: z.record(z.unknown()),
+});
+
+export type PresetConfig = z.infer<typeof PresetConfigSchema>;
+
+// ============================================================================
+// Curation Set Schema (Typesense 30.0+ - global curation rules)
+// ============================================================================
+
+export const CurationRuleSchema = z.object({
+  query: z.string().optional(),
+  match: z.enum(["exact", "contains"]).optional(),
+  filter_by: z.string().optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+export const CurationItemSchema = z.object({
+  id: z.string(),
+  rule: CurationRuleSchema.optional(),
+  includes: z
+    .array(
+      z.object({
+        id: z.string(),
+        position: z.number(),
+      })
+    )
+    .optional(),
+  excludes: z
+    .array(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .optional(),
+  filter_by: z.string().optional(),
+  sort_by: z.string().optional(),
+  replace_query: z.string().optional(),
+  remove_matched_tokens: z.boolean().optional(),
+  filter_curated_hits: z.boolean().optional(),
+  stop_processing: z.boolean().optional(),
+  metadata: z.record(z.unknown()).optional(),
+  effective_from_ts: z.number().optional(),
+  effective_to_ts: z.number().optional(),
+});
+
+export type CurationItem = z.infer<typeof CurationItemSchema>;
+
+export const CurationSetConfigSchema = z.object({
+  name: z.string(),
+  items: z.array(CurationItemSchema),
+});
+
+export type CurationSetConfig = z.infer<typeof CurationSetConfigSchema>;
+
+// ============================================================================
+// Stemming Dictionary Schema
+// ============================================================================
+
+export const StemmingWordSchema = z.object({
+  word: z.string(),
+  root: z.string(),
+});
+
+export type StemmingWord = z.infer<typeof StemmingWordSchema>;
+
+export const StemmingDictionaryConfigSchema = z.object({
+  id: z.string(),
+  words: z.array(StemmingWordSchema),
+});
+
+export type StemmingDictionaryConfig = z.infer<typeof StemmingDictionaryConfigSchema>;
+
+// ============================================================================
 // Full Config Schema
 // ============================================================================
 
@@ -231,8 +330,13 @@ export const TypesenseConfigSchema = z.object({
   // Global synonym sets (Typesense 30.0+)
   synonymSets: z.array(SynonymSetConfigSchema).optional(),
   overrides: z.array(OverrideConfigSchema).optional(),
+  // Global curation sets (Typesense 30.0+)
+  curationSets: z.array(CurationSetConfigSchema).optional(),
   analyticsRules: z.array(AnalyticsRuleConfigSchema).optional(),
   apiKeys: z.array(ApiKeyConfigSchema).optional(),
+  stopwords: z.array(StopwordSetConfigSchema).optional(),
+  presets: z.array(PresetConfigSchema).optional(),
+  stemmingDictionaries: z.array(StemmingDictionaryConfigSchema).optional(),
 });
 
 export type TypesenseConfig = z.infer<typeof TypesenseConfigSchema>;
@@ -241,7 +345,7 @@ export type TypesenseConfig = z.infer<typeof TypesenseConfigSchema>;
 // Resource Types for State Management
 // ============================================================================
 
-export type ResourceType = "collection" | "alias" | "synonym" | "synonymSet" | "override" | "analyticsRule" | "apiKey";
+export type ResourceType = "collection" | "alias" | "synonym" | "synonymSet" | "override" | "curationSet" | "analyticsRule" | "apiKey" | "stopword" | "preset" | "stemmingDictionary";
 
 export interface ResourceIdentifier {
   type: ResourceType;
@@ -252,7 +356,7 @@ export interface ResourceIdentifier {
 
 export interface ManagedResource {
   identifier: ResourceIdentifier;
-  config: CollectionConfig | AliasConfig | SynonymConfig | SynonymSetConfig | OverrideConfig | AnalyticsRuleConfig | ApiKeyConfig;
+  config: CollectionConfig | AliasConfig | SynonymConfig | SynonymSetConfig | OverrideConfig | CurationSetConfig | AnalyticsRuleConfig | ApiKeyConfig | StopwordSetConfig | PresetConfig | StemmingDictionaryConfig;
   checksum: string;
   lastUpdated: string;
 }

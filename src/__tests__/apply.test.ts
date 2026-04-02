@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { setupClient, cleanupTypesense } from "./setup.js";
+import { getTypesenseVersion } from "./helpers.js";
 import { buildPlan } from "../plan/index.js";
 import { applyPlan } from "../apply/index.js";
 import { loadState } from "../state/index.js";
@@ -61,7 +62,9 @@ describe("apply", () => {
     expect(alias!.collection).toBe("products");
   });
 
-  test("creates synonym via apply", async () => {
+  test("creates synonym via apply (pre-v30)", async () => {
+    const version = await getTypesenseVersion();
+    if (version >= 30) return;
     // Create collection first
     await createCollection({
       name: "products",
@@ -84,7 +87,9 @@ describe("apply", () => {
     expect(synonym).not.toBeNull();
   });
 
-  test("creates override via apply", async () => {
+  test("creates override via apply (pre-v30)", async () => {
+    const version = await getTypesenseVersion();
+    if (version >= 30) return;
     await createCollection({
       name: "products",
       fields: [{ name: "title", type: "string" }],

@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test";
 import { setupClient, cleanupTypesense } from "./setup.js";
+import { getTypesenseVersion } from "./helpers.js";
 import {
   createCollection,
   getCollection,
@@ -237,8 +238,11 @@ describe("resources", () => {
     });
   });
 
-  describe("synonyms", () => {
+  describe("synonyms (legacy, pre-v30)", () => {
+    let version: number;
+
     beforeEach(async () => {
+      version = await getTypesenseVersion();
       await createCollection({
         name: "products",
         fields: [{ name: "title", type: "string" }],
@@ -246,6 +250,7 @@ describe("resources", () => {
     });
 
     test("upsertSynonym creates multi-way synonym", async () => {
+      if (version >= 30) return; // Legacy API removed in v30
       await upsertSynonym({
         id: "phone-synonyms",
         collection: "products",
@@ -258,6 +263,7 @@ describe("resources", () => {
     });
 
     test("upsertSynonym creates one-way synonym", async () => {
+      if (version >= 30) return;
       await upsertSynonym({
         id: "tv-synonym",
         collection: "products",
@@ -271,11 +277,13 @@ describe("resources", () => {
     });
 
     test("getSynonym returns null for non-existent", async () => {
+      if (version >= 30) return;
       const result = await getSynonym("nonexistent", "products");
       expect(result).toBeNull();
     });
 
     test("listSynonyms returns all synonyms for collection", async () => {
+      if (version >= 30) return;
       await upsertSynonym({
         id: "syn1",
         collection: "products",
@@ -292,6 +300,7 @@ describe("resources", () => {
     });
 
     test("listAllSynonyms aggregates across collections", async () => {
+      if (version >= 30) return;
       await createCollection({
         name: "users",
         fields: [{ name: "name", type: "string" }],
@@ -313,6 +322,7 @@ describe("resources", () => {
     });
 
     test("deleteSynonym removes synonym", async () => {
+      if (version >= 30) return;
       await upsertSynonym({
         id: "syn1",
         collection: "products",
@@ -324,14 +334,18 @@ describe("resources", () => {
     });
 
     test("upsertSynonym throws without synonyms or root", async () => {
+      if (version >= 30) return;
       expect(
         upsertSynonym({ id: "bad", collection: "products" })
       ).rejects.toThrow("must have either 'synonyms' or 'root'");
     });
   });
 
-  describe("overrides", () => {
+  describe("overrides (legacy, pre-v30)", () => {
+    let version: number;
+
     beforeEach(async () => {
+      version = await getTypesenseVersion();
       await createCollection({
         name: "products",
         fields: [{ name: "title", type: "string" }],
@@ -339,6 +353,7 @@ describe("resources", () => {
     });
 
     test("upsertOverride creates override with includes", async () => {
+      if (version >= 30) return;
       await upsertOverride({
         id: "pin-featured",
         collection: "products",
@@ -352,6 +367,7 @@ describe("resources", () => {
     });
 
     test("upsertOverride creates override with filter_by", async () => {
+      if (version >= 30) return;
       await upsertOverride({
         id: "boost-shoes",
         collection: "products",
@@ -365,11 +381,13 @@ describe("resources", () => {
     });
 
     test("getOverride returns null for non-existent", async () => {
+      if (version >= 30) return;
       const result = await getOverride("nonexistent", "products");
       expect(result).toBeNull();
     });
 
     test("listOverrides returns all overrides for collection", async () => {
+      if (version >= 30) return;
       await upsertOverride({
         id: "ov1",
         collection: "products",
@@ -388,6 +406,7 @@ describe("resources", () => {
     });
 
     test("listAllOverrides aggregates across collections", async () => {
+      if (version >= 30) return;
       await createCollection({
         name: "users",
         fields: [{ name: "name", type: "string" }],
@@ -411,6 +430,7 @@ describe("resources", () => {
     });
 
     test("deleteOverride removes override", async () => {
+      if (version >= 30) return;
       await upsertOverride({
         id: "ov1",
         collection: "products",

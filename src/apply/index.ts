@@ -17,6 +17,12 @@ import {
 } from "../resources/synonymset.js";
 import { upsertOverride, deleteOverride } from "../resources/override.js";
 import {
+  createCurationSet,
+  updateCurationSet,
+  deleteCurationSet,
+  getCurationSet,
+} from "../resources/curationset.js";
+import {
   createAnalyticsRule,
   updateAnalyticsRule,
   deleteAnalyticsRule,
@@ -26,6 +32,17 @@ import {
   deleteApiKeyByDescription,
   getApiKey,
 } from "../resources/apikey.js";
+import {
+  upsertStopwordSet,
+  deleteStopwordSet,
+} from "../resources/stopword.js";
+import {
+  upsertPreset,
+  deletePreset,
+} from "../resources/preset.js";
+import {
+  upsertStemmingDictionary,
+} from "../resources/stemmingdictionary.js";
 import { buildNewState } from "../plan/index.js";
 import type {
   Plan,
@@ -36,8 +53,12 @@ import type {
   SynonymConfig,
   SynonymSetConfig,
   OverrideConfig,
+  CurationSetConfig,
   AnalyticsRuleConfig,
   ApiKeyConfig,
+  StopwordSetConfig,
+  PresetConfig,
+  StemmingDictionaryConfig,
 } from "../types/index.js";
 
 export interface ApplyResult {
@@ -149,6 +170,46 @@ async function applyChange(change: ResourceChange): Promise<void> {
       break;
     }
 
+    case "curationSet": {
+      if (action === "create") {
+        await createCurationSet(change.after as CurationSetConfig);
+      } else if (action === "update") {
+        const existing = await getCurationSet(identifier.name);
+        if (existing) {
+          await updateCurationSet(change.after as CurationSetConfig, existing);
+        }
+      } else if (action === "delete") {
+        await deleteCurationSet(identifier.name);
+      }
+      break;
+    }
+
+    case "stopword": {
+      if (action === "create" || action === "update") {
+        await upsertStopwordSet(change.after as StopwordSetConfig);
+      } else if (action === "delete") {
+        await deleteStopwordSet(identifier.name);
+      }
+      break;
+    }
+
+    case "preset": {
+      if (action === "create" || action === "update") {
+        await upsertPreset(change.after as PresetConfig);
+      } else if (action === "delete") {
+        await deletePreset(identifier.name);
+      }
+      break;
+    }
+
+    case "stemmingDictionary": {
+      if (action === "create" || action === "update") {
+        await upsertStemmingDictionary(change.after as StemmingDictionaryConfig);
+      }
+      // Note: Typesense does not support deleting stemming dictionaries via API
+      break;
+    }
+
     default:
       throw new Error(`Unknown resource type: ${identifier.type}`);
   }
@@ -182,15 +243,19 @@ export async function applyPlan(
   // Resource type priority for ordering (lower = first)
   // SynonymSets must be created before collections that reference them
   const createOrder: Record<string, number> = {
-    synonymSet: 0,
-    collection: 1,
-    alias: 2,
-    synonym: 3,
-    override: 4,
-    analyticsRule: 5,
-    apiKey: 6,
+    stemmingDictionary: 0,
+    synonymSet: 1,
+    curationSet: 2,
+    stopword: 3,
+    preset: 4,
+    collection: 5,
+    alias: 6,
+    synonym: 7,
+    override: 8,
+    analyticsRule: 9,
+    apiKey: 10,
   };
-  // For deletes, reverse the order (collections before synonym sets)
+  // For deletes, reverse the order
   const deleteOrder: Record<string, number> = {
     apiKey: 0,
     analyticsRule: 1,
@@ -198,7 +263,11 @@ export async function applyPlan(
     synonym: 3,
     alias: 4,
     collection: 5,
-    synonymSet: 6,
+    preset: 6,
+    stopword: 7,
+    curationSet: 8,
+    synonymSet: 9,
+    stemmingDictionary: 10,
   };
 
   const sortByType = (a: ResourceChange, b: ResourceChange, order: Record<string, number>) => {

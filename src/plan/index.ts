@@ -17,12 +17,24 @@ import {
   synonymSetConfigsEqual,
   getOverride,
   listAllOverrides,
+  getCurationSet,
+  listCurationSets,
+  curationSetConfigsEqual,
   getAnalyticsRule,
   listAnalyticsRules,
   analyticsRuleConfigsEqual,
   getApiKey,
   listApiKeys,
   apiKeyConfigsEqual,
+  getStopwordSet,
+  listStopwordSets,
+  stopwordSetConfigsEqual,
+  getPreset,
+  listPresets,
+  presetConfigsEqual,
+  getStemmingDictionary,
+  listStemmingDictionaries,
+  stemmingDictionaryConfigsEqual,
   type StoredApiKey,
 } from "../resources/index.js";
 import type {
@@ -35,8 +47,12 @@ import type {
   SynonymConfig,
   SynonymSetConfig,
   OverrideConfig,
+  CurationSetConfig,
   AnalyticsRuleConfig,
   ApiKeyConfig,
+  StopwordSetConfig,
+  PresetConfig,
+  StemmingDictionaryConfig,
   ManagedResource,
   State,
 } from "../types/index.js";
@@ -502,6 +518,158 @@ export async function buildPlan(config: TypesenseConfig): Promise<Plan> {
     }
   }
 
+  // Plan curation sets (Typesense 30.0+)
+  if (config.curationSets) {
+    for (const curationSetConfig of config.curationSets) {
+      const identifier: ResourceIdentifier = {
+        type: "curationSet",
+        name: curationSetConfig.name,
+      };
+      const resourceId = formatResourceId(identifier);
+      desiredResources.add(resourceId);
+
+      const existing = await getCurationSet(curationSetConfig.name);
+
+      if (!existing) {
+        changes.push({
+          action: "create",
+          identifier,
+          after: curationSetConfig,
+          diff: generateDiff(null, curationSetConfig),
+        });
+      } else if (!curationSetConfigsEqual(existing, curationSetConfig)) {
+        changes.push({
+          action: "update",
+          identifier,
+          before: existing,
+          after: curationSetConfig,
+          diff: generateDiff(existing, curationSetConfig),
+        });
+      } else {
+        changes.push({
+          action: "no-change",
+          identifier,
+          before: existing,
+          after: curationSetConfig,
+        });
+      }
+    }
+  }
+
+  // Plan stopwords
+  if (config.stopwords) {
+    for (const stopwordConfig of config.stopwords) {
+      const identifier: ResourceIdentifier = {
+        type: "stopword",
+        name: stopwordConfig.id,
+      };
+      const resourceId = formatResourceId(identifier);
+      desiredResources.add(resourceId);
+
+      const existing = await getStopwordSet(stopwordConfig.id);
+
+      if (!existing) {
+        changes.push({
+          action: "create",
+          identifier,
+          after: stopwordConfig,
+          diff: generateDiff(null, stopwordConfig),
+        });
+      } else if (!stopwordSetConfigsEqual(existing, stopwordConfig)) {
+        changes.push({
+          action: "update",
+          identifier,
+          before: existing,
+          after: stopwordConfig,
+          diff: generateDiff(existing, stopwordConfig),
+        });
+      } else {
+        changes.push({
+          action: "no-change",
+          identifier,
+          before: existing,
+          after: stopwordConfig,
+        });
+      }
+    }
+  }
+
+  // Plan presets
+  if (config.presets) {
+    for (const presetConfig of config.presets) {
+      const identifier: ResourceIdentifier = {
+        type: "preset",
+        name: presetConfig.name,
+      };
+      const resourceId = formatResourceId(identifier);
+      desiredResources.add(resourceId);
+
+      const existing = await getPreset(presetConfig.name);
+
+      if (!existing) {
+        changes.push({
+          action: "create",
+          identifier,
+          after: presetConfig,
+          diff: generateDiff(null, presetConfig),
+        });
+      } else if (!presetConfigsEqual(existing, presetConfig)) {
+        changes.push({
+          action: "update",
+          identifier,
+          before: existing,
+          after: presetConfig,
+          diff: generateDiff(existing, presetConfig),
+        });
+      } else {
+        changes.push({
+          action: "no-change",
+          identifier,
+          before: existing,
+          after: presetConfig,
+        });
+      }
+    }
+  }
+
+  // Plan stemming dictionaries
+  if (config.stemmingDictionaries) {
+    for (const stemmingConfig of config.stemmingDictionaries) {
+      const identifier: ResourceIdentifier = {
+        type: "stemmingDictionary",
+        name: stemmingConfig.id,
+      };
+      const resourceId = formatResourceId(identifier);
+      desiredResources.add(resourceId);
+
+      const existing = await getStemmingDictionary(stemmingConfig.id);
+
+      if (!existing) {
+        changes.push({
+          action: "create",
+          identifier,
+          after: stemmingConfig,
+          diff: generateDiff(null, stemmingConfig),
+        });
+      } else if (!stemmingDictionaryConfigsEqual(existing, stemmingConfig)) {
+        changes.push({
+          action: "update",
+          identifier,
+          before: existing,
+          after: stemmingConfig,
+          diff: generateDiff(existing, stemmingConfig),
+        });
+      } else {
+        changes.push({
+          action: "no-change",
+          identifier,
+          before: existing,
+          after: stemmingConfig,
+        });
+      }
+    }
+  }
+
   // Find resources to delete (in state but not in config)
   for (const resource of state.resources) {
     const resourceId = formatResourceId(resource.identifier);
@@ -721,6 +889,66 @@ export function buildNewState(
     }
   }
 
+  // Add curation sets
+  if (config.curationSets) {
+    for (const curationSetConfig of config.curationSets) {
+      resources.push({
+        identifier: {
+          type: "curationSet",
+          name: curationSetConfig.name,
+        },
+        config: curationSetConfig,
+        checksum: computeChecksum(curationSetConfig),
+        lastUpdated: now,
+      });
+    }
+  }
+
+  // Add stopwords
+  if (config.stopwords) {
+    for (const stopwordConfig of config.stopwords) {
+      resources.push({
+        identifier: {
+          type: "stopword",
+          name: stopwordConfig.id,
+        },
+        config: stopwordConfig,
+        checksum: computeChecksum(stopwordConfig),
+        lastUpdated: now,
+      });
+    }
+  }
+
+  // Add presets
+  if (config.presets) {
+    for (const presetConfig of config.presets) {
+      resources.push({
+        identifier: {
+          type: "preset",
+          name: presetConfig.name,
+        },
+        config: presetConfig,
+        checksum: computeChecksum(presetConfig),
+        lastUpdated: now,
+      });
+    }
+  }
+
+  // Add stemming dictionaries
+  if (config.stemmingDictionaries) {
+    for (const stemmingConfig of config.stemmingDictionaries) {
+      resources.push({
+        identifier: {
+          type: "stemmingDictionary",
+          name: stemmingConfig.id,
+        },
+        config: stemmingConfig,
+        checksum: computeChecksum(stemmingConfig),
+        lastUpdated: now,
+      });
+    }
+  }
+
   return {
     version: currentState.version,
     resources,
@@ -736,8 +964,12 @@ export async function importResources(): Promise<{
   synonyms: SynonymConfig[];
   synonymSets: SynonymSetConfig[];
   overrides: OverrideConfig[];
+  curationSets: CurationSetConfig[];
   analyticsRules: AnalyticsRuleConfig[];
   apiKeys: ApiKeyConfig[];
+  stopwords: StopwordSetConfig[];
+  presets: PresetConfig[];
+  stemmingDictionaries: StemmingDictionaryConfig[];
 }> {
   const collections = await listCollections();
   const aliases = await listAliases();
@@ -747,7 +979,11 @@ export async function importResources(): Promise<{
   const synonyms = await listAllSynonyms(collectionNames);
   const synonymSets = await listSynonymSets();
   const overrides = await listAllOverrides(collectionNames);
+  const curationSets = await listCurationSets();
   const analyticsRules = await listAnalyticsRules();
+  const stopwords = await listStopwordSets();
+  const presets = await listPresets();
+  const stemmingDictionaries = await listStemmingDictionaries();
 
   // Get API keys (note: actual key values are not retrievable after creation)
   // Only include non-default values to keep config minimal
@@ -765,7 +1001,7 @@ export async function importResources(): Promise<{
     return config;
   });
 
-  return { collections, aliases, synonyms, synonymSets, overrides, analyticsRules, apiKeys };
+  return { collections, aliases, synonyms, synonymSets, overrides, curationSets, analyticsRules, apiKeys, stopwords, presets, stemmingDictionaries };
 }
 
 // ============================================================================
@@ -874,6 +1110,18 @@ export async function detectDrift(): Promise<DriftReport> {
           break;
         case "apiKey":
           actualConfig = await getApiKey(identifier.name);
+          break;
+        case "curationSet":
+          actualConfig = await getCurationSet(identifier.name);
+          break;
+        case "stopword":
+          actualConfig = await getStopwordSet(identifier.name);
+          break;
+        case "preset":
+          actualConfig = await getPreset(identifier.name);
+          break;
+        case "stemmingDictionary":
+          actualConfig = await getStemmingDictionary(identifier.name);
           break;
       }
     } catch {

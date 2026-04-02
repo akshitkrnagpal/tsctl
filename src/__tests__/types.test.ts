@@ -11,6 +11,11 @@ import {
   AnalyticsRuleConfigSchema,
   ApiKeyConfigSchema,
   SynonymSetConfigSchema,
+  StopwordSetConfigSchema,
+  PresetConfigSchema,
+  CurationSetConfigSchema,
+  CurationItemSchema,
+  StemmingDictionaryConfigSchema,
 } from "../types/index.js";
 
 describe("types / schemas", () => {
@@ -19,7 +24,7 @@ describe("types / schemas", () => {
       const validTypes = [
         "string", "string[]", "int32", "int32[]", "int64", "int64[]",
         "float", "float[]", "bool", "bool[]", "geopoint", "geopoint[]",
-        "object", "object[]", "auto", "string*", "image",
+        "geopolygon", "object", "object[]", "auto", "string*", "image",
       ];
       for (const type of validTypes) {
         expect(FieldTypeSchema.parse(type)).toBe(type);
@@ -52,10 +57,18 @@ describe("types / schemas", () => {
         stem: true,
         store: true,
         range_index: true,
+        stem_dictionary: "english-plurals",
+        truncate_len: 200,
+        token_separators: ["-"],
+        symbols_to_index: ["#"],
       });
       expect(field.optional).toBe(true);
       expect(field.facet).toBe(true);
       expect(field.locale).toBe("en");
+      expect(field.stem_dictionary).toBe("english-plurals");
+      expect(field.truncate_len).toBe(200);
+      expect(field.token_separators).toEqual(["-"]);
+      expect(field.symbols_to_index).toEqual(["#"]);
     });
 
     test("parses field with vector options", () => {
@@ -253,6 +266,107 @@ describe("types / schemas", () => {
     });
   });
 
+  describe("StopwordSetConfigSchema", () => {
+    test("parses stopword set", () => {
+      const set = StopwordSetConfigSchema.parse({
+        id: "english-stopwords",
+        stopwords: ["the", "a", "an"],
+      });
+      expect(set.id).toBe("english-stopwords");
+      expect(set.stopwords).toHaveLength(3);
+    });
+
+    test("parses stopword set with locale", () => {
+      const set = StopwordSetConfigSchema.parse({
+        id: "german",
+        stopwords: ["der", "die", "das"],
+        locale: "de",
+      });
+      expect(set.locale).toBe("de");
+    });
+  });
+
+  describe("PresetConfigSchema", () => {
+    test("parses preset", () => {
+      const preset = PresetConfigSchema.parse({
+        name: "listing_view",
+        value: { q: "*", sort_by: "popularity:desc" },
+      });
+      expect(preset.name).toBe("listing_view");
+      expect(preset.value).toBeDefined();
+    });
+  });
+
+  describe("CurationSetConfigSchema", () => {
+    test("parses curation set", () => {
+      const set = CurationSetConfigSchema.parse({
+        name: "product-curations",
+        items: [
+          {
+            id: "pin-featured",
+            rule: { query: "featured", match: "exact" },
+            includes: [{ id: "product-123", position: 1 }],
+          },
+        ],
+      });
+      expect(set.name).toBe("product-curations");
+      expect(set.items).toHaveLength(1);
+    });
+
+    test("parses curation item with all options", () => {
+      const item = CurationItemSchema.parse({
+        id: "boost",
+        rule: { query: "shoes", match: "contains", filter_by: "brand:=Nike", tags: ["promo"] },
+        filter_by: "category:=footwear",
+        sort_by: "popularity:desc",
+        replace_query: "running shoes",
+        remove_matched_tokens: false,
+        filter_curated_hits: true,
+        stop_processing: false,
+        metadata: { campaign: "spring-sale" },
+        effective_from_ts: 1672531200,
+        effective_to_ts: 1704067200,
+      });
+      expect(item.rule?.tags).toEqual(["promo"]);
+      expect(item.metadata?.campaign).toBe("spring-sale");
+      expect(item.stop_processing).toBe(false);
+    });
+  });
+
+  describe("StemmingDictionaryConfigSchema", () => {
+    test("parses stemming dictionary", () => {
+      const dict = StemmingDictionaryConfigSchema.parse({
+        id: "english-plurals",
+        words: [
+          { word: "dogs", root: "dog" },
+          { word: "cats", root: "cat" },
+        ],
+      });
+      expect(dict.id).toBe("english-plurals");
+      expect(dict.words).toHaveLength(2);
+    });
+  });
+
+  describe("CollectionConfigSchema with v30 fields", () => {
+    test("parses collection with metadata", () => {
+      const config = CollectionConfigSchema.parse({
+        name: "products",
+        fields: [{ name: "title", type: "string" }],
+        metadata: { team: "search", version: 2 },
+      });
+      expect(config.metadata?.team).toBe("search");
+    });
+
+    test("parses collection with curation_sets", () => {
+      const config = CollectionConfigSchema.parse({
+        name: "products",
+        fields: [{ name: "title", type: "string" }],
+        curation_sets: ["product-curations"],
+      });
+      expect(config.curation_sets).toEqual(["product-curations"]);
+    });
+  });
+
   describe("TypesenseConfigSchema", () => {
     test("parses empty config", () => {
       const config = TypesenseConfigSchema.parse({});
@@ -266,12 +380,20 @@ describe("types / schemas", () => {
         synonyms: [{ id: "syn1", collection: "products", synonyms: ["a", "b"] }],
         overrides: [{ id: "ov1", collection: "products", rule: { query: "x", match: "exact" } }],
         apiKeys: [{ description: "key1", actions: ["*"], collections: ["*"] }],
+        stopwords: [{ id: "sw1", stopwords: ["the", "a"] }],
+        presets: [{ name: "p1", value: { q: "*" } }],
+        curationSets: [{ name: "cs1", items: [{ id: "r1", rule: { query: "x", match: "exact" } }] }],
+        stemmingDictionaries: [{ id: "d1", words: [{ word: "dogs", root: "dog" }] }],
       });
       expect(config.collections).toHaveLength(1);
       expect(config.aliases).toHaveLength(1);
       expect(config.synonyms).toHaveLength(1);
       expect(config.overrides).toHaveLength(1);
       expect(config.apiKeys).toHaveLength(1);
+      expect(config.stopwords).toHaveLength(1);
+      expect(config.presets).toHaveLength(1);
+      expect(config.curationSets).toHaveLength(1);
+      expect(config.stemmingDictionaries).toHaveLength(1);
     });
   });
 

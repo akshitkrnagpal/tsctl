@@ -44,4 +44,34 @@ export async function cleanupTypesense() {
   } catch {
     // analytics may not be available
   }
+
+  // Delete all stopword sets
+  try {
+    const stopwordsResponse = await client.stopwords().retrieve();
+    for (const sw of stopwordsResponse.stopwords) {
+      await client.stopwords(sw.id).delete();
+    }
+  } catch {
+    // stopwords may not be available
+  }
+
+  // Delete all presets
+  try {
+    const presetsResponse = await client.presets().retrieve();
+    for (const preset of presetsResponse.presets) {
+      await client.presets(preset.name).delete();
+    }
+  } catch {
+    // presets may not be available
+  }
+
+  // Delete all curation sets (v30+)
+  try {
+    const curationSets = await client.curationSets().retrieve();
+    for (const set of curationSets) {
+      await client.curationSets(set.name).delete();
+    }
+  } catch {
+    // curation sets may not be available (pre-v30)
+  }
 }
