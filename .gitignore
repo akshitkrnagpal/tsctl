@@ -1,6 +1,8 @@
-dist
+dist/
 node_modules
 
 # Compiled binaries (built during release)
 bin/tsctl
-bin/tsctl-*
+bin/tsctl-linux-*
+bin/tsctl-darwin-*
+bin/tsctl-windows-*

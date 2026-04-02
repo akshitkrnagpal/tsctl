@@ -33,6 +33,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Build for npm
+        run: bun run build:npm
+
       - name: Setup Node.js for npm publish
         uses: actions/setup-node@v4
         with:
@@ -70,6 +73,9 @@ jobs:
       - name: Type check
         run: bun run typecheck
 
+      - name: Build for npm
+        run: bun run build:npm
+
       - name: Setup Node.js for GitHub Packages
         uses: actions/setup-node@v4
         with:
@@ -82,12 +88,6 @@ jobs:
         env:
           INPUT_VERSION: ${{ github.event.inputs.version }}
         run: npm version "$INPUT_VERSION" --no-git-tag-version
-
-      - name: Update package name for GitHub Packages
-        run: |
-          # GitHub Packages requires scoped package names
-          jq '.name = "@tsctl/cli"' package.json > package.tmp.json
-          mv package.tmp.json package.json
 
       - name: Publish to GitHub Packages
         run: npm publish --access public
