@@ -1,14 +1,20 @@
 # tsctl - Terraform-like CLI for Typesense
 
-A declarative infrastructure-as-code CLI for managing Typesense collections, aliases, synonyms, and curations.
+A declarative infrastructure-as-code CLI for managing Typesense collections, aliases, synonyms, curations, analytics, API keys, stopwords, presets, and more.
+
+Supports **Typesense v27+** and **v30+** with full backward compatibility.
 
 ## Features
 
-- **Declarative configuration**: Define your Typesense schema in TypeScript config files
+- **Declarative configuration**: Define your Typesense schema in TypeScript, JSON, or YAML config files
 - **Plan/Apply workflow**: See what will change before applying
 - **State management**: State stored in Typesense itself—no external dependencies
 - **Type-safe**: Full TypeScript support with autocomplete and validation
 - **Import existing**: Import existing Typesense resources into managed state
+- **Drift detection**: Detect changes made outside of tsctl
+- **Blue/green migrations**: Zero-downtime collection schema updates
+- **Multi-environment**: Manage development, staging, and production environments
+- **v29/v30 compatible**: Supports both legacy per-collection synonyms/overrides and v30 global synonym sets/curation sets
 
 ## Installation
 
@@ -196,17 +202,24 @@ collections:
       infix: true,           // Enable infix search
       locale: "en",          // Language for stemming
       stem: true,            // Enable stemming
+      stem_dictionary: "en-plurals", // Custom stemming dictionary
       store: true,           // Store original value
       num_dim: 384,          // Vector dimensions
       vec_dist: "cosine",    // Vector distance metric
       reference: "users.id", // JOINs
       range_index: true,     // For numeric range queries
+      truncate_len: 200,     // Max chars per token (default: 100)
+      token_separators: ["-"], // Field-level token separators
+      symbols_to_index: ["#"], // Field-level symbols to index
     },
   ],
   default_sorting_field: "created_at",
   token_separators: ["-", "/"],
   symbols_to_index: ["#", "@"],
   enable_nested_fields: true,
+  metadata: { team: "search" }, // Custom metadata
+  synonym_sets: ["clothing-synonyms"], // Link synonym sets (v30+)
+  curation_sets: ["product-curations"], // Link curation sets (v30+)
 }
 ```
 
@@ -217,6 +230,7 @@ collections:
 - `float`, `float[]` - Decimals
 - `bool`, `bool[]` - Booleans
 - `geopoint`, `geopoint[]` - Coordinates
+- `geopolygon` - Geographic polygon
 - `object`, `object[]` - Nested objects
 - `auto` - Auto-detect type
 - `string*` - Auto-embedding
@@ -231,7 +245,9 @@ collections:
 }
 ```
 
-### Synonyms
+### Synonyms (Legacy - Typesense < 30.0)
+
+Per-collection synonyms for Typesense versions before 30.0.
 
 ```typescript
 {
@@ -252,7 +268,33 @@ For one-way synonyms (root word):
 }
 ```
 
-### Overrides/Curations
+### Synonym Sets (Typesense 30.0+ - Global)
+
+Global synonym sets that can be shared across collections.
+
+```typescript
+{
+  name: "clothing-synonyms",
+  items: [
+    { id: "pants", synonyms: ["pants", "trousers", "slacks"] },
+    { id: "shirt", synonyms: ["shirt", "top", "blouse"] },
+    { id: "tv", root: "television", synonyms: ["tv", "telly"] },
+  ],
+}
+```
+
+Link to collections:
+```typescript
+{
+  name: "products",
+  fields: [...],
+  synonym_sets: ["clothing-synonyms"],
+}
+```
+
+### Overrides/Curations (Legacy - Typesense < 30.0)
+
+Per-collection overrides for Typesense versions before 30.0.
 
 ```typescript
 {
@@ -269,21 +311,85 @@ For one-way synonyms (root word):
 }
 ```
 
-Additional options:
+### Curation Sets (Typesense 30.0+ - Global)
+
+Global curation rules that can be shared across collections.
 
 ```typescript
 {
-  id: "boost-category",
-  collection: "products",
-  rule: {
-    query: "shoes",
-    match: "contains",
+  name: "product-curations",
+  items: [
+    {
+      id: "pin-featured",
+      rule: { query: "featured", match: "exact" },
+      includes: [{ id: "product-123", position: 1 }],
+    },
+    {
+      id: "boost-shoes",
+      rule: { query: "shoes", match: "contains" },
+      filter_by: "category:=footwear",
+      sort_by: "popularity:desc",
+      remove_matched_tokens: true,
+      effective_from_ts: 1672531200,
+      effective_to_ts: 1704067200,
+    },
+  ],
+}
+```
+
+Link to collections:
+```typescript
+{
+  name: "products",
+  fields: [...],
+  curation_sets: ["product-curations"],
+}
+```
+
+### Stopwords
+
+Define stopword sets to remove common words from search queries.
+
+```typescript
+{
+  id: "english-stopwords",
+  stopwords: ["the", "a", "an", "is", "are", "was", "were"],
+  locale: "en", // optional
+}
+```
+
+### Search Presets
+
+Store reusable search parameter configurations.
+
+```typescript
+{
+  name: "listing_view",
+  value: {
+    searches: [
+      {
+        collection: "products",
+        q: "*",
+        sort_by: "popularity:desc",
+      },
+    ],
   },
-  filter_by: "category:=footwear",
-  sort_by: "popularity:desc",
-  remove_matched_tokens: true,
-  effective_from_ts: 1672531200,
-  effective_to_ts: 1704067200,
+}
+```
+
+### Analytics Rules
+
+```typescript
+{
+  name: "popular-queries",
+  type: "popular_queries", // popular_queries | nohits_queries | counter | log
+  collection: "products",
+  event_type: "search", // search | click | conversion | visit | custom
+  params: {
+    destination_collection: "popular_queries",
+    limit: 1000,
+    expand_query: true,
+  },
 }
 ```
 
@@ -305,10 +411,107 @@ With expiration:
   actions: ["*"],
   collections: ["*"],
   expires_at: 1735689600, // Unix timestamp
+  autodelete: true,
 }
 ```
 
-**Note:** API key values are only shown once when created. If you update an API key's configuration, a new key will be generated and the old one will be deleted.
+### Stemming Dictionaries
+
+Custom word-to-root mappings for stemming.
+
+```typescript
+{
+  id: "english-plurals",
+  words: [
+    { word: "dogs", root: "dog" },
+    { word: "cats", root: "cat" },
+    { word: "mice", root: "mouse" },
+  ],
+}
+```
+
+Reference from fields:
+```typescript
+{
+  name: "title",
+  type: "string",
+  stem_dictionary: "english-plurals",
+}
+```
+
+## Full Configuration Example
+
+```typescript
+import { defineConfig } from "tsctl";
+
+export default defineConfig({
+  collections: [
+    {
+      name: "products",
+      fields: [
+        { name: "name", type: "string" },
+        { name: "description", type: "string", optional: true },
+        { name: "price", type: "float" },
+        { name: "category", type: "string", facet: true },
+      ],
+      default_sorting_field: "price",
+      synonym_sets: ["product-synonyms"],
+      curation_sets: ["product-curations"],
+    },
+  ],
+
+  aliases: [
+    { name: "products_live", collection: "products" },
+  ],
+
+  // v30+ global synonym sets
+  synonymSets: [
+    {
+      name: "product-synonyms",
+      items: [
+        { id: "phones", synonyms: ["phone", "mobile", "smartphone"] },
+      ],
+    },
+  ],
+
+  // v30+ global curation sets
+  curationSets: [
+    {
+      name: "product-curations",
+      items: [
+        {
+          id: "featured",
+          rule: { query: "featured", match: "exact" },
+          includes: [{ id: "product-1", position: 1 }],
+        },
+      ],
+    },
+  ],
+
+  stopwords: [
+    { id: "english", stopwords: ["the", "a", "an"] },
+  ],
+
+  presets: [
+    { name: "default_search", value: { q: "*", sort_by: "price:asc" } },
+  ],
+
+  apiKeys: [
+    {
+      description: "Search-only key",
+      actions: ["documents:search"],
+      collections: ["products"],
+    },
+  ],
+
+  stemmingDictionaries: [
+    {
+      id: "en-plurals",
+      words: [{ word: "shoes", root: "shoe" }],
+    },
+  ],
+});
+```
 
 ## State Management
 
@@ -327,7 +530,7 @@ tsctl import
 ```
 
 This will:
-1. Scan your Typesense instance
+1. Scan your Typesense instance for all resource types
 2. Generate a `tsctl.imported.config.ts` file
 3. Save the current state
 
@@ -375,25 +578,6 @@ tsctl apply --env production
 tsctl import --env development
 ```
 
-### Environment Commands
-
-```bash
-# List available environments
-tsctl env list
-
-# Show current environment configuration
-tsctl env show
-
-# Show specific environment
-tsctl --env production env show
-```
-
-### How It Works
-
-1. Base `.env` file is always loaded first
-2. If `--env <name>` is specified, `.env.<name>` is loaded and overrides base values
-3. State is stored per-Typesense-instance, so each environment has its own state
-
 ## Drift Detection
 
 Detect when resources have been modified outside of tsctl (e.g., via Typesense dashboard or API).
@@ -406,6 +590,8 @@ Output shows:
 - **Modified**: Resources changed outside of tsctl
 - **Deleted**: Resources removed outside of tsctl
 - **Unmanaged**: Resources that exist but aren't in your config
+
+Drift detection covers all resource types: collections, aliases, stopwords, presets, curation sets, and more.
 
 ### CI/CD Integration
 
@@ -473,29 +659,23 @@ tsctl migrate -a products_live -c tsctl.config.ts --cleanup products_17064864000
 | `--switch-only` | Only switch alias |
 | `--cleanup <name>` | Delete old collection |
 
-### Rollback
+## Typesense Version Compatibility
 
-If something goes wrong, switch the alias back:
+| Feature | v27 | v28 | v29 | v30+ |
+|---------|-----|-----|-----|------|
+| Collections | Yes | Yes | Yes | Yes |
+| Aliases | Yes | Yes | Yes | Yes |
+| Per-collection Synonyms | Yes | Yes | Yes | Deprecated* |
+| Per-collection Overrides | Yes | Yes | Yes | Deprecated* |
+| Global Synonym Sets | - | Yes | Yes | Yes |
+| Global Curation Sets | - | - | - | Yes |
+| API Keys | Yes | Yes | Yes | Yes |
+| Analytics Rules | Yes | Yes | Yes | Yes |
+| Stopwords | Yes | Yes | Yes | Yes |
+| Presets | Yes | Yes | Yes | Yes |
+| Stemming Dictionaries | - | Yes | Yes | Yes |
 
-```bash
-# List collection versions
-tsctl state list
-
-# Manually switch alias back
-# Edit your config to point to the old collection and run:
-tsctl apply
-```
-
-## Roadmap
-
-- [x] Collections
-- [x] Aliases
-- [x] Synonyms
-- [x] Overrides/Curations
-- [x] API Keys management
-- [x] Multi-environment support
-- [x] Drift detection
-- [x] Migration support (blue/green collections)
+\* Auto-migrated to global sets on upgrade to v30
 
 ## License
 
