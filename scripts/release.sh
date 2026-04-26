@@ -190,10 +190,10 @@ cp "$FORMULA_TMP" "$TAP_DIR/Formula/${BIN_NAME}.rb"
 
 (
   cd "$TAP_DIR"
-  if git diff --quiet; then
+  git add "Formula/${BIN_NAME}.rb"
+  if git diff --cached --quiet; then
     echo "    formula unchanged, nothing to commit"
   else
-    git add "Formula/${BIN_NAME}.rb"
     git commit -m "${BIN_NAME}: ${VERSION}"
     git push origin HEAD
     echo "    pushed"
