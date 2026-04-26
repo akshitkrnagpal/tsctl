@@ -65,14 +65,19 @@ DIST=dist/release
 rm -rf "$DIST"
 mkdir -p "$DIST"
 
-declare -a TARGETS=(
+# Build sequentially. SHAs collected into parallel `SHA_<name>` shell
+# variables (avoids bash 3.2 lacking associative arrays - macOS default).
+TARGETS=(
   "darwin-arm64:bun-darwin-arm64"
   "darwin-x64:bun-darwin-x64"
   "linux-arm64:bun-linux-arm64"
   "linux-x64:bun-linux-x64"
 )
 
-declare -A SHAS=()
+SHA_DARWIN_ARM64=""
+SHA_DARWIN_X64=""
+SHA_LINUX_ARM64=""
+SHA_LINUX_X64=""
 
 for entry in "${TARGETS[@]}"; do
   name="${entry%%:*}"
@@ -93,7 +98,12 @@ for entry in "${TARGETS[@]}"; do
   rm -rf "$out_dir"
 
   sha=$(shasum -a 256 "$archive" | awk '{print $1}')
-  SHAS["$name"]="$sha"
+  case "$name" in
+    darwin-arm64) SHA_DARWIN_ARM64="$sha" ;;
+    darwin-x64)   SHA_DARWIN_X64="$sha" ;;
+    linux-arm64)  SHA_LINUX_ARM64="$sha" ;;
+    linux-x64)    SHA_LINUX_X64="$sha" ;;
+  esac
   echo "    archive: $(basename "$archive")"
   echo "    sha256:  $sha"
 done
@@ -141,20 +151,20 @@ class Tsctl < Formula
   on_macos do
     if Hardware::CPU.intel?
       url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${BIN_NAME}_${VERSION}_darwin-x64.tar.gz"
-      sha256 "${SHAS[darwin-x64]}"
+      sha256 "${SHA_DARWIN_X64}"
     elsif Hardware::CPU.arm?
       url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${BIN_NAME}_${VERSION}_darwin-arm64.tar.gz"
-      sha256 "${SHAS[darwin-arm64]}"
+      sha256 "${SHA_DARWIN_ARM64}"
     end
   end
 
   on_linux do
     if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
       url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${BIN_NAME}_${VERSION}_linux-x64.tar.gz"
-      sha256 "${SHAS[linux-x64]}"
+      sha256 "${SHA_LINUX_X64}"
     elsif Hardware::CPU.arm? && Hardware::CPU.is_64_bit?
       url "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${BIN_NAME}_${VERSION}_linux-arm64.tar.gz"
-      sha256 "${SHAS[linux-arm64]}"
+      sha256 "${SHA_LINUX_ARM64}"
     end
   end
 
