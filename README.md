@@ -19,10 +19,16 @@ Supports **Typesense v27+** and **v30+** with full backward compatibility.
 ## Installation
 
 ```bash
+# Homebrew
+brew install akshitkrnagpal/tap/tsctl
+
+# npm
 npm install -g @tsctl/cli
-# or
+# or run without installing
 npx @tsctl/cli
 ```
+
+The Homebrew tap ships single static binaries built with `bun --compile` for macOS (arm64/x64) and Linux (arm64/x64). See `scripts/release.sh` for how releases are cut.
 
 ## Quick Start
 
