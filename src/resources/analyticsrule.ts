@@ -116,6 +116,32 @@ export async function deleteAnalyticsRule(name: string): Promise<void> {
 }
 
 /**
+ * Stringify a value with deterministic, recursively-sorted object keys.
+ * Two values that differ only by object-key ordering produce the same string.
+ * Used so that equality stays in sync with the diff renderer (which sorts
+ * keys via normalizeConfig in plan/index.ts) — otherwise plan can flag an
+ * "update" with an empty diff body.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || value === undefined) return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return "[" + value.map(stableStringify).join(",") + "]";
+  }
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const keys = Object.keys(obj).sort();
+    return (
+      "{" +
+      keys
+        .map((k) => JSON.stringify(k) + ":" + stableStringify(obj[k]))
+        .join(",") +
+      "}"
+    );
+  }
+  return JSON.stringify(value);
+}
+
+/**
  * Compare two analytics rule configs for equality
  */
 export function analyticsRuleConfigsEqual(
@@ -137,5 +163,5 @@ export function analyticsRuleConfigsEqual(
     return result;
   };
 
-  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+  return stableStringify(normalize(a)) === stableStringify(normalize(b));
 }
