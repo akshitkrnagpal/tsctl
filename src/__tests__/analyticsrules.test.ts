@@ -274,7 +274,10 @@ describe("analytics rules (integration)", () => {
     expect(result!.params?.limit).toBe(500);
   });
 
-  test("analyticsRuleConfigsEqual with matching params", () => {
+});
+
+describe("analyticsRuleConfigsEqual (unit)", () => {
+  test("matching params are equal", () => {
     const a: AnalyticsRuleConfig = {
       name: "rule",
       type: "popular_queries",
@@ -286,7 +289,7 @@ describe("analytics rules (integration)", () => {
     expect(analyticsRuleConfigsEqual(a, b)).toBe(true);
   });
 
-  test("analyticsRuleConfigsEqual with different params", () => {
+  test("different params are not equal", () => {
     const a: AnalyticsRuleConfig = {
       name: "rule",
       type: "popular_queries",
@@ -299,5 +302,37 @@ describe("analytics rules (integration)", () => {
       params: { limit: 200 },
     };
     expect(analyticsRuleConfigsEqual(a, b)).toBe(false);
+  });
+
+  test("treats remote rule_tag:'' as absent (regression)", () => {
+    // Typesense returns rule_tag: "" for rules that were created without one.
+    // A local config that omits rule_tag should NOT be treated as different.
+    const local: AnalyticsRuleConfig = {
+      name: "rule",
+      type: "popular_queries",
+      collection: "products",
+      event_type: "search",
+      params: { limit: 100 },
+    };
+    const remote: AnalyticsRuleConfig = {
+      ...local,
+      rule_tag: "",
+    };
+    expect(analyticsRuleConfigsEqual(local, remote)).toBe(true);
+    expect(analyticsRuleConfigsEqual(remote, local)).toBe(true);
+  });
+
+  test("still detects real rule_tag changes", () => {
+    const a: AnalyticsRuleConfig = {
+      name: "rule",
+      type: "popular_queries",
+      collection: "products",
+      event_type: "search",
+      rule_tag: "v1",
+    };
+    const b: AnalyticsRuleConfig = { ...a, rule_tag: "v2" };
+    const c: AnalyticsRuleConfig = { ...a, rule_tag: "" };
+    expect(analyticsRuleConfigsEqual(a, b)).toBe(false);
+    expect(analyticsRuleConfigsEqual(a, c)).toBe(false);
   });
 });

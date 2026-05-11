@@ -12,14 +12,15 @@ export async function getAnalyticsRule(
   try {
     const data = await client.analytics.rules(name).retrieve();
 
-    return {
+    const config: AnalyticsRuleConfig = {
       name: data.name,
       type: data.type as AnalyticsRuleConfig["type"],
       collection: data.collection,
       event_type: data.event_type as AnalyticsRuleConfig["event_type"],
-      rule_tag: data.rule_tag,
-      params: data.params,
     };
+    if (data.rule_tag) config.rule_tag = data.rule_tag;
+    if (data.params) config.params = data.params;
+    return config;
   } catch (error: unknown) {
     if (
       error &&
@@ -117,7 +118,9 @@ export function analyticsRuleConfigsEqual(
   a: AnalyticsRuleConfig,
   b: AnalyticsRuleConfig
 ): boolean {
-  // Normalize by removing undefined values
+  // Normalize by removing undefined and empty values.
+  // Typesense returns rule_tag as "" when unset; treat that as absent so a
+  // local config without rule_tag doesn't diff against a remote with "".
   const normalize = (config: AnalyticsRuleConfig) => {
     const result: Record<string, unknown> = {
       name: config.name,
@@ -125,8 +128,8 @@ export function analyticsRuleConfigsEqual(
       collection: config.collection,
       event_type: config.event_type,
     };
-    if (config.rule_tag !== undefined) result.rule_tag = config.rule_tag;
-    if (config.params !== undefined) result.params = config.params;
+    if (config.rule_tag) result.rule_tag = config.rule_tag;
+    if (config.params) result.params = config.params;
     return result;
   };
 
