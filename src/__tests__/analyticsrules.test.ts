@@ -364,4 +364,49 @@ describe("analyticsRuleConfigsEqual (unit)", () => {
     expect(analyticsRuleConfigsEqual(a, b)).toBe(false);
     expect(analyticsRuleConfigsEqual(a, c)).toBe(false);
   });
+
+  test("ignores params key ordering (regression for issue #5)", () => {
+    // Without recursive key sorting, two params objects with the same keys
+    // in a different insertion order produce different JSON strings, which
+    // marks the rule as "update" with an empty diff body in plan output.
+    const a: AnalyticsRuleConfig = {
+      name: "rule",
+      type: "popular_queries",
+      collection: "products",
+      event_type: "search",
+      params: {
+        capture_search_requests: true,
+        destination_collection: "popular",
+        expand_query: false,
+        limit: 100,
+      },
+    };
+    const b: AnalyticsRuleConfig = {
+      ...a,
+      params: {
+        limit: 100,
+        capture_search_requests: true,
+        destination_collection: "popular",
+        expand_query: false,
+      },
+    };
+    expect(analyticsRuleConfigsEqual(a, b)).toBe(true);
+  });
+
+  test("ignores top-level key ordering", () => {
+    const a: AnalyticsRuleConfig = {
+      name: "rule",
+      type: "popular_queries",
+      collection: "products",
+      event_type: "search",
+    };
+    // Different field insertion order
+    const b: AnalyticsRuleConfig = {
+      event_type: "search",
+      collection: "products",
+      type: "popular_queries",
+      name: "rule",
+    };
+    expect(analyticsRuleConfigsEqual(a, b)).toBe(true);
+  });
 });
