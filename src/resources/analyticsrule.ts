@@ -42,7 +42,11 @@ export async function listAnalyticsRules(): Promise<AnalyticsRuleConfig[]> {
 
   try {
     const response = await client.analytics.rules().retrieve();
-    const rules = response.rules || [];
+    // Typesense v27-v29 returns { rules: [...] }; v30+ returns [...] directly.
+    // Accept both shapes so `tsctl import` doesn't silently drop rules on v30.
+    const rules: NonNullable<typeof response.rules> = Array.isArray(response)
+      ? response
+      : response.rules ?? [];
 
     return rules.map((rule) => {
       const config: AnalyticsRuleConfig = {

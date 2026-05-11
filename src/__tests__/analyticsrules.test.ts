@@ -171,6 +171,35 @@ describe("analytics rules (integration)", () => {
     expect(result).toBeNull();
   });
 
+  test("listAnalyticsRules works across Typesense versions (regression for v30 response shape)", async () => {
+    // v30 returns rules as a bare array; v27-v29 wraps it in { rules: [...] }.
+    // listAnalyticsRules must handle both so `tsctl import` doesn't drop rules
+    // on v30. Runs on every supported version where analytics is enabled.
+    if (!analyticsAvailable) return;
+    await createCollection({
+      name: "products",
+      fields: [{ name: "title", type: "string" }],
+    });
+    await createCollection({
+      name: "popular_queries_dest",
+      fields: [
+        { name: "q", type: "string" },
+        { name: "count", type: "int32" },
+      ],
+    });
+    await createAnalyticsRule({
+      name: "regression-list-v30",
+      type: "popular_queries",
+      collection: "products",
+      event_type: "search",
+      params: { destination_collection: "popular_queries_dest", limit: 10 },
+    });
+
+    const rules = await listAnalyticsRules();
+    const names = rules.map((r) => r.name);
+    expect(names).toContain("regression-list-v30");
+  });
+
   test("listAnalyticsRules returns all rules", async () => {
     if (version >= 30 || !analyticsAvailable) return;
     await createCollection({
