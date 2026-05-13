@@ -1,6 +1,6 @@
 {
   "name": "@tsctl/cli",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Terraform-like CLI for managing Typesense collections, aliases, synonyms, and curations",
   "type": "module",
   "main": "./dist/index.mjs",
@@ -29,7 +29,10 @@
     "start": "bun run src/cli/index.ts",
     "prepublishOnly": "bun run build:npm",
     "typecheck": "bun x tsc --noEmit",
-    "test": "bun test"
+    "test": "bun test",
+    "changeset": "changeset",
+    "version-package": "changeset version",
+    "release": "bun run build:npm && changeset publish"
   },
   "keywords": [
     "typesense",
@@ -59,6 +62,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "@types/diff": "^5.2.1",
     "@types/node": "^20.14.10",
     "typescript": "^5.5.3"
