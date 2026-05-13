@@ -76,6 +76,35 @@ describe("plan", () => {
       expect(plan.summary.update).toBe(1);
     });
 
+    // Regression for https://github.com/akshitkrnagpal/tsctl/issues/7
+    // The pre-fix comparator iterated the local fields array and, on no
+    // remote match, fell back to returning the local item verbatim. Result:
+    // the "projected remote" was byte-identical to local and the diff
+    // reported no change, silently dropping field additions.
+    test("plans update when a new field is added to an existing collection", async () => {
+      await createCollection({
+        name: "products",
+        fields: [{ name: "title", type: "string" }],
+      });
+
+      const config: TypesenseConfig = {
+        collections: [
+          {
+            name: "products",
+            fields: [
+              { name: "title", type: "string" },
+              { name: "gender", type: "string", optional: true, facet: true },
+            ],
+          },
+        ],
+      };
+
+      const plan = await buildPlan(config);
+      expect(plan.hasChanges).toBe(true);
+      expect(plan.summary.update).toBe(1);
+      expect(plan.changes[0]!.action).toBe("update");
+    });
+
     test("plans deletion for resource in state but not in config", async () => {
       await createCollection({
         name: "products",
