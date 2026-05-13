@@ -161,21 +161,33 @@ function normalizeRemoteForComparison<T extends object>(remote: T, local: T): T 
       ) as T[keyof T];
     } else if (Array.isArray(remoteValue) && Array.isArray(localValue)) {
       // Handle arrays (like fields array) - reorder to match local order
-      // and normalize each matching item
-      result[key] = localValue.map((localItem) => {
+      // and normalize each matching item. For named-array items where the
+      // local entry has no remote counterpart, skip the slot entirely so
+      // the projected-remote array is shorter than local and the diff
+      // detects the addition. (Mirrors the object branch above, which
+      // `continue`s when remoteValue === undefined.)
+      result[key] = localValue.flatMap((localItem) => {
         if (typeof localItem === "object" && localItem !== null) {
           const matchingRemote = findMatchingLocalItem(
             localItem as Record<string, unknown>,
             remoteValue
           );
           if (matchingRemote) {
-            return normalizeRemoteForComparison(
-              matchingRemote,
-              localItem as Record<string, unknown>
-            );
+            return [
+              normalizeRemoteForComparison(
+                matchingRemote,
+                localItem as Record<string, unknown>
+              ),
+            ];
           }
+          // Local-only item: omit from projected remote so the diff fires.
+          return [];
         }
-        return localItem;
+        // Primitive items: keep the local value. We can't index primitives
+        // by name, so a positional "match" isn't meaningful here. If local
+        // and remote primitive arrays differ, the parent equality check
+        // will still catch it via the length/value mismatch.
+        return [localItem];
       }) as T[keyof T];
     } else {
       result[key] = remoteValue;
